@@ -13,6 +13,11 @@ def args(need=0, usage="usage: %s [args]" % sys.argv[0]):
 		return sys.argv[1:]
 	
 
+class CommandFailedError(Exception): pass
+class CommandLimitError(CommandFailedError): pass
+class ForcedWaitingError(CommandFailedError): pass
+
+
 # tcp
 class connection(object):
 	def __init__(self, host='localhost', port=20003):
@@ -23,8 +28,6 @@ class connection(object):
 		s.connect((host,port))
 		self.f = s.makefile('rw', 1)
 		s.close()
-#		self.f = file("pipe.3.read", 'r')
-#		self.w = file("pipe.3.write", 'w')
 	
 	def __getattr__(self, name):
 		'''cmd_STH forward to cmd(), else forward to self.f'''
@@ -44,6 +47,8 @@ class connection(object):
 	def readfloat(self): return self._catch_read(scanf.readfloat)
 	def readstr(self):   return self._catch_read(scanf.readstr)
 	def readline(self):  return self._catch_read(scanf.readline)
+	def readints(self, n):
+		return map(lambda _: self.readint(), xrange(n))
 	
 	
 	def _read_ack(self):
@@ -51,15 +56,17 @@ class connection(object):
 		result = self._readstr_assert(['OK', 'FAILED'])
 		if result == 'FAILED':
 			errno = self.readint()
-			rest = self.readline()
-			res = "FAILED " + str(errno) + " " + rest	
-			print bad(res)
-			if errno == 7: # next command will force waiting
-				print bad(self.readline())
+			msg = self.readline()
+			description = "FAILED " + str(errno) + " " + msg
+			print bad(description)
+			if errno == 7: # forced waiting
+				print bad(self.readline()) # FORCED_WAITING secs
 				self._read_ack()
-			return res
-		else:
-			return ""
+				raise ForcedWaitingError(description)
+			elif errno == 6: 
+				raise CommandLimitError(description)
+			else:
+				raise CommandFailedError(description)
 			
 					
 		
@@ -70,6 +77,7 @@ class connection(object):
 			what = [what]
 		if result not in what: print warn(result)
 		return result
+	
 	
 	def writeln(self, line):
 		self.write(line+'\n')
@@ -83,9 +91,15 @@ class connection(object):
 		self._readstr_assert('PASS')
 		self.cmd(password)
 	
+
 	def cmd(self, what):
 		'''sends command what, waits for OK, reads some lines'''
 		self.writeln(what)
+		try:
+			self._read_ack()
+		except (CommandLimitError, ForcedWaitingError):
+			self.cmd(what)	# repeat the command
+
 		res = self._read_ack()
 		if res.startswith("FAILED 6"): # command limit reached
 			return self.cmd(what)
@@ -93,40 +107,10 @@ class connection(object):
 			return self.cmd(what)
 		return res
 	
+
 	def wait(self):
 		'''waits for next turn'''
 		self.cmd_wait()
 		print info(self.readline())
 		self._read_ack()
 	
-	
-	
-	def score(self):
-		self.cmd_get_score()
-		return self.readfloat()
-	
-	def order_count(self):
-		self.cmd_get_order_count()
-		return self.readint()
-	
-	def time_to_cut(self):
-		self.cmd_time_to_cut()
-		return self.readint()
-	
-		
-		
-		
-		
-		
-		
-
-
-
-
-	
-	
-	
-	
-	
-	
-

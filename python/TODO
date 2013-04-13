@@ -1,3 +1,0 @@
-* przeportować do Py3
-* nie zabijać procesu w czasie dumpowania (dane się psują)
-* sensownie reagować na limit komend
