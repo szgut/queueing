@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 from colors import bad, warn, info, good
 import scanf
@@ -20,7 +19,7 @@ class ForcedWaitingError(CommandFailedError): pass
 
 
 # tcp
-class connection(object):
+class Connection(object):
 	def __init__(self, host='localhost', port=20003):
 		'''connect to server'''
 		import socket
@@ -99,7 +98,7 @@ class connection(object):
 			self._read_ack()
 		except (CommandLimitError, ForcedWaitingError):
 			self.cmd(what)	# repeat the command
-				
+
 
 	def wait(self):
 		'''waits for next turn'''
