@@ -23,4 +23,7 @@ args = dl24.misc.args()
 conn = Connection()
 
 print good(getparam(args, "pam"))
-print conn.dupa()
+try:
+	print conn.dupa()
+except dl24.connection.CommandFailedError as e:
+	print e.errno

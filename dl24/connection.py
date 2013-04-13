@@ -4,7 +4,11 @@ import scanf
 import misc
 	
 
-class CommandFailedError(Exception): pass
+class CommandFailedError(Exception):
+	def __init__(self, msg, errno=None):
+		super(CommandFailedError, self).__init__(msg)
+		self.errno = errno
+
 class CommandLimitError(CommandFailedError): pass
 class ForcedWaitingError(CommandFailedError): pass
 
@@ -56,7 +60,7 @@ class Connection(object):
 			elif errno == 6: 
 				raise CommandLimitError(description)
 			else:
-				raise CommandFailedError(description)
+				raise CommandFailedError(description, errno=errno)
 			
 					
 		
