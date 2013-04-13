@@ -12,7 +12,20 @@ def insist(exception=KeyboardInterrupt):
 					sys.stderr.write("retrying %s...\n" % fun.__name__)
 		return wrapper
 	return decorator
-	
+
+
+def flatten(*items):
+	for item in items:
+		if isinstance(item, basestring):
+			yield item
+		else:
+			try:
+				for elem in flatten(*item):
+					yield elem
+			except TypeError:
+				yield item
+
+
 
 if __name__ == '__main__':
 	from time import sleep

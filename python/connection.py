@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from colors import bad, warn, info, good
 import scanf
+import misc
 import sys
 
 # args
@@ -32,9 +33,8 @@ class connection(object):
 	def __getattr__(self, name):
 		'''cmd_STH forward to cmd(), else forward to self.f'''
 		if name.startswith("cmd_"):
-			def clo(*args, **kwargs):
-				args = [name[4:].upper()] + list(args)
-				return self.cmd(*args, **kwargs)
+			def clo(*what):
+				return self.cmd(name[4:].upper(), *what)
 			return clo 
 		else:
 			return getattr(self.f, name)
@@ -78,9 +78,9 @@ class connection(object):
 		if result not in what: print warn(result)
 		return result
 	
-	
-	def writeln(self, line):
-		self.write(line+'\n')
+
+	def writeln(self, *what):
+		self.write(" ".join(map(str, misc.flatten(what))) +"\n")
 	
 	
 	
@@ -92,21 +92,14 @@ class connection(object):
 		self.cmd(password)
 	
 
-	def cmd(self, what):
+	def cmd(self, *what):
 		'''sends command what, waits for OK, reads some lines'''
-		self.writeln(what)
+		self.writeln(*what)
 		try:
 			self._read_ack()
 		except (CommandLimitError, ForcedWaitingError):
 			self.cmd(what)	# repeat the command
-
-		res = self._read_ack()
-		if res.startswith("FAILED 6"): # command limit reached
-			return self.cmd(what)
-		elif res.startswith("FAILED 7"): # force waiting
-			return self.cmd(what)
-		return res
-	
+				
 
 	def wait(self):
 		'''waits for next turn'''
