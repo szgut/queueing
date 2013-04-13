@@ -2,15 +2,6 @@
 from colors import bad, warn, info, good
 import scanf
 import misc
-import sys
-
-# args
-def args(need=0, usage="usage: %s [args]" % sys.argv[0]):
-	if len(sys.argv) < need+1:
-		print usage
-		sys.exit(1)
-	else:
-		return sys.argv[1:]
 	
 
 class CommandFailedError(Exception): pass
@@ -97,7 +88,7 @@ class Connection(object):
 		try:
 			self._read_ack()
 		except (CommandLimitError, ForcedWaitingError):
-			self.cmd(what)	# repeat the command
+			self.cmd(*what)	# repeat the command
 
 
 	def wait(self):
