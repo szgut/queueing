@@ -1,47 +1,57 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import dl24.connection
-import dl24.misc
-from dl24.misc import getparam
+from dl24.misc import Serializator
 from dl24.colors import warn, bad, good, info
+import argparse
 
-class config(object):
-	datafile = 'data'
-	host = 'localhost'
-	port = 1234
-
+class Config(object):
+	def __init__(self, universum=1):
+		self.host = 'localhost'
+		self.datafile = 'data'
+		self.port = 20000+universum-1
 
 class Connection(dl24.connection.Connection):
-	def __init__(self):
-		super(Connection, self).__init__(config.host, config.port)
-
 	# implementacja komend z zadania
 	def dupa(self):
 		self.cmd_dupa(3, [4, 5])
 		return self.readints(2)
 
 
+def parse_args():
+	parser = argparse.ArgumentParser()
+	parser.add_argument("-U", "--universum", metavar="N", type=int, 
+		help="universum number", default=1)
+	parser.add_argument("-D", "--dontload", action='store_false', 
+		help="do not load initial state from dump file", dest='loadstate')
+	return parser.parse_args()
+
 def init_state(read):
 	global global_sth
 	if read:
-		global_sth = serializator.read()
+		global_sth = serializator.load()
 	else:
-		global_sth = 123
+		global_sth = 0
+
 
 
 def loop():
-	pass
+	import time
+	print "."
+	time.sleep(3)
 
 
 if __name__ == '__main__':
-	args = dl24.misc.args()
-	#conn = Connection()
-	serializator = dl24.misc.Serializator(config.datafile)
+	args = parse_args()
+	config = Config(args.universum)
+	conn = Connection(config.host, config.port)
+	serializator = Serializator(config.datafile)
 
-	print good(getparam(args, "pam"))
-
-	init_state(False)
-	try:
+	init_state(args.loadstate)
+	global_sth += 1
+	print global_sth
+	
+	try: # main loop
 		while 1:
 			loop()
 			conn.wait()

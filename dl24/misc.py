@@ -2,7 +2,6 @@
 import functools
 import colors
 import cPickle as pickle
-import sys
 
 def insist(exception=KeyboardInterrupt):
 	def decorator(fun):
@@ -42,32 +41,3 @@ class Serializator(object):
 		print colors.info("zapisuję...")
 		with open(self.path+suf, 'wb') as f:
 			pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
-
-
-# argparse!
-def args(need=0, usage="usage: %s [args]" % sys.argv[0]):
-	if len(sys.argv) < need+1:
-		print usage
-		sys.exit(1)
-	else:
-		return sys.argv[1:]
-
-def getparam(args, param):
-    for arg in args:
-        if arg.startswith(param):
-            return int(arg.split('=')[1])
-    return None
-
-if __name__ == '__main__':
-	from time import sleep
-
-	count = 0
-
-	@insist()
-	def inc(limit):
-		global count
-		count += 1
-		sleep(2)
-		return count
-		
-	sys.stdout.write("%d\n" % inc(7000000))
