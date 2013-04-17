@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
 import dl24.connection
 import dl24.misc
 from dl24.misc import getparam
@@ -42,5 +44,8 @@ if __name__ == '__main__':
 	try:
 		while 1:
 			loop()
+			conn.wait()
 	except KeyboardInterrupt:
 		serializator.save(global_sth)
+	except dl24.connection.ConnectionLostError:
+		serializator.save(global_sth, ".crash")

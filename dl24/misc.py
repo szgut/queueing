@@ -38,9 +38,9 @@ class Serializator(object):
 			print colors.info("wczytuję...")
 			return pickle.load(f)
 
-	def save(self, obj):
+	def save(self, obj, suf=""):
 		print colors.info("zapisuję...")
-		with open(self.path, 'wb') as f:
+		with open(self.path+suf, 'wb') as f:
 			pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 

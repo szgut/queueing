@@ -12,6 +12,7 @@ class CommandFailedError(Exception):
 class CommandLimitError(CommandFailedError): pass
 class ForcedWaitingError(CommandFailedError): pass
 
+class ConnectionLostError(Exception): pass
 
 # tcp
 class Connection(object):
@@ -36,7 +37,8 @@ class Connection(object):
 	def _catch_read(self, fun):
 		try: return fun(self)
 		except EOFError:
-			raise Exception(warn("połączenie zerwane"))			
+			warn("połączenie zerwane")
+			raise ConnectionLost
 	def readint(self):   return self._catch_read(scanf.readint)
 	def readfloat(self): return self._catch_read(scanf.readfloat)
 	def readstr(self):   return self._catch_read(scanf.readstr)
