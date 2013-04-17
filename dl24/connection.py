@@ -37,8 +37,8 @@ class Connection(object):
 	def _catch_read(self, fun):
 		try: return fun(self)
 		except EOFError:
-			warn("połączenie zerwane")
-			raise ConnectionLost
+			print warn("połączenie zerwane")
+			raise ConnectionLostError
 	def readint(self):   return self._catch_read(scanf.readint)
 	def readfloat(self): return self._catch_read(scanf.readfloat)
 	def readstr(self):   return self._catch_read(scanf.readstr)
