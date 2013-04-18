@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 import functools
-import colors
+import signal
+import contextlib
 import cPickle as pickle
+import colors
 
 def insist(exception=KeyboardInterrupt):
 	def decorator(fun):
@@ -41,3 +43,14 @@ class Serializer(object):
 		print colors.info("zapisuję...")
 		with open(self.path+suf, 'wb') as f:
 			pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
+
+
+@contextlib.contextmanager
+def delay_sigint():
+	exc = [False]
+	def handler(signal, frame):
+		exc[0] = True
+	signal.signal(signal.SIGINT, handler)
+	yield
+	if exc[0]:
+		raise KeyboardInterrupt
