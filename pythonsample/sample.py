@@ -4,6 +4,7 @@ import dl24.connection
 from dl24.misc import Serializator
 from dl24.colors import warn, bad, good, info
 import argparse
+import traceback
 
 class Config(object):
 	def __init__(self, universum=1):
@@ -44,8 +45,10 @@ def loop():
 if __name__ == '__main__':
 	args = parse_args()
 	config = Config(args.universum)
-	conn = Connection(config.host, config.port)
 	serializator = Serializator(config.datafile)
+	conn = Connection(config.host, config.port)
+	conn.login()
+	print info("logged in")
 
 	init_state(args.loadstate)
 	global_sth += 1
@@ -57,5 +60,6 @@ if __name__ == '__main__':
 			conn.wait()
 	except KeyboardInterrupt:
 		serializator.save(global_sth)
-	except dl24.connection.ConnectionLostError:
+	except:
+		traceback.print_exc()
 		serializator.save(global_sth, ".crash")

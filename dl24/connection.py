@@ -1,14 +1,16 @@
 # -*- coding: utf-8 -*-
 from colors import bad, warn, info, good
+import socket
 import scanf
 import misc
 	
-
 class CommandFailedError(Exception):
+	def __new__(cls, msg, errno=None):
+		exceptions = {6: CommandLimitError, 7: ForcedWaitingError}
+		return super(CommandFailedError, cls).__new__(exceptions.get(errno, cls))
 	def __init__(self, msg, errno=None):
 		super(CommandFailedError, self).__init__(msg)
 		self.errno = errno
-
 class CommandLimitError(CommandFailedError): pass
 class ForcedWaitingError(CommandFailedError): pass
 
@@ -18,7 +20,6 @@ class ConnectionLostError(Exception): pass
 class Connection(object):
 	def __init__(self, host='localhost', port=20003):
 		'''connect to server'''
-		import socket
 		s = socket.socket()
 		s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 		s.connect((host,port))
@@ -58,14 +59,9 @@ class Connection(object):
 			if errno == 7: # forced waiting
 				print bad(self.readline()) # FORCED_WAITING secs
 				self._read_ack()
-				raise ForcedWaitingError(description)
-			elif errno == 6: 
-				raise CommandLimitError(description)
-			else:
-				raise CommandFailedError(description, errno=errno)
-			
-					
-		
+			raise CommandFailedError(description, errno)
+
+
 	def _readstr_assert(self, what):
 		'''read token and make sure is in list what or equals string what'''
 		result = self.readstr()
@@ -77,7 +73,6 @@ class Connection(object):
 
 	def writeln(self, *what):
 		self.write(" ".join(map(str, misc.flatten(what))) +"\n")
-	
 	
 	
 	def login(self, name="team13", password="efemztzlxt"):
@@ -102,4 +97,3 @@ class Connection(object):
 		self.cmd_wait()
 		print info(self.readline())
 		self._read_ack()
-	
