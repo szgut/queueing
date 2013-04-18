@@ -30,7 +30,7 @@ def parse_args():
 def init_state(read):
 	global global_sth
 	if read:
-		global_sth = serializator.load()
+		global_sth = serializer.load()
 	else:
 		global_sth = 0
 
