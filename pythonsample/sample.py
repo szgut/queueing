@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import dl24.connection
 from dl24.misc import Serializer
+from dl24.misc import delay_sigint
 from dl24.colors import warn, bad, good, info
 import argparse
 import traceback
