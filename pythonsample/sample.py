@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import dl24.connection
-from dl24.misc import Serializator
+from dl24.misc import Serializer
 from dl24.colors import warn, bad, good, info
 import argparse
 import traceback
@@ -45,7 +45,7 @@ def loop():
 if __name__ == '__main__':
 	args = parse_args()
 	config = Config(args.universum)
-	serializator = Serializator(config.datafile)
+	serializer = Serializer(config.datafile)
 	conn = Connection(config.host, config.port)
 	conn.login()
 	print info("logged in")
@@ -59,7 +59,7 @@ if __name__ == '__main__':
 			loop()
 			conn.wait()
 	except KeyboardInterrupt:
-		serializator.save(global_sth)
+		serializer.save(global_sth)
 	except:
 		traceback.print_exc()
-		serializator.save(global_sth, ".crash")
+		serializer.save(global_sth, ".crash")

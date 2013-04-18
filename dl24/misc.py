@@ -28,7 +28,7 @@ def flatten(*items):
 				yield item
 
 
-class Serializator(object):
+class Serializer(object):
 	def __init__(self, path):
 		self.path = path
 
