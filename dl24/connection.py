@@ -90,7 +90,7 @@ class Connection(object):
 		self._login()
 
 
-	def login(self, name="team9", password="emefbvvxle"):
+	def _login(self, name="team9", password="emefbvvxle"):
 		'''login to server'''
 		self._readstr_assert('LOGIN')
 		self.writeln(name)
