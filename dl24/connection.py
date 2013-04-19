@@ -75,7 +75,7 @@ class Connection(object):
 		self.write(" ".join(map(str, misc.flatten(what))) +"\n")
 	
 	
-	def login(self, name="team13", password="efemztzlxt"):
+	def login(self, name="team9", password="emefbvvxle"):
 		'''login to server'''
 		self._readstr_assert('LOGIN')
 		self.writeln(name)
