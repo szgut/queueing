@@ -229,11 +229,14 @@ def init_state(read):
 class Napykalacz(Thread):
 	def run(self):
 		while napykalam:
-			global lista
-			global lid
-			print info('szukam')
-			lista = list(sorted(gs.allposs(), key = lambda x: -x[0]))
-			print good('Nowa lista!')
+			try:
+				global lista
+				global lid
+				print info('szukam')
+				lista = list(sorted(gs.allposs(), key = lambda x: -x[0]))
+				print good('Nowa lista!')
+			except:
+				pass
 
 zmienna_statyczna = [1]
 napykalam = False
