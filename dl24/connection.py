@@ -102,7 +102,7 @@ class Connection(object):
 		self.writeln(*what)
 		try:
 			self._read_ack()
-		except (CommandLimitError, ForcedWaitingError, ConnectionResetError):
+		except (ForcedWaitingError, ConnectionResetError):
 			self.cmd(*what)	# repeat the command
 
 

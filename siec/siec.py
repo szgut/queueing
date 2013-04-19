@@ -10,11 +10,13 @@ import traceback
 class Config(object):
 	def __init__(self, universum=1):
 		self.host = 'universum.dl24'
-		self.datafile = 'data'
-		self.port = 20002+universum-1
+		self.datafile = 'data%d' % universum
+		self.port = 20002 + universum-1
 		self.limitD = 1000 if universum == 2 else None
 
 class Connection(dl24.connection.Connection):
+	def __init__(self, host='universum.dl24', port=20002):
+		super(Connection, self).__init__(host, port)
 	# implementacja komend z zadania
 	
 	def time_to_request(self):
