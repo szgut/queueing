@@ -46,6 +46,10 @@ ROTS = [
 	(2,0,3),
 ]
 
+ROTS_ARRS = None
+
+
+
 def r2a(how):
 	def _sin(x): return [0,1,0,-1][x]
 	def _cos(x): return [1,0,-1,0][x]
@@ -106,8 +110,13 @@ class Connection(dl24.connection.Connection):
 		return w
 	
 	def drop(self, x):
+		(raz, dwa, x, y) = x
+		x = (raz, dwa, x+1, y+1)
 		self.cmd_drop_brick(x)
-		self.readline()
+		blah = self._readstr_assert(['ACCEPTED', 'REJECTED_HEIGHT', 'REJECTED_MATCH'])
+		if blah == 'ACCEPTED': return self.readfloat()
+		elif blah == 'REJECTED_HEIGHT': raise RejectedHeight
+		else: raise RejectedMatch
 	
 	def bricks(self):
 		self.cmd_list_bricks()
@@ -127,6 +136,7 @@ class Connection(dl24.connection.Connection):
 	
 	def above(self):
 		self.cmd_view_from_above()
+		print gs.world.X, gs.world.Y
 		li = [ [conn.readint() for x in range(gs.world.X)] for x in range(gs.world.Y)]
 		li.reverse()
 		return np.matrix(li)
@@ -186,7 +196,7 @@ class State(object):
 						slajs = self.above[y:y+D, x:x+D]
 						h0 = (slajs - himap).max()
 						touches = ((himap + h0) == slajs).sum()
-						if touches >= brick.pmin:
+						if touches >= brick.pmin and h0 + D <= Z:
 							yield (brick.w * (self.world.Cv * volume + self.world.Cp * touches),
 								(bid, ROTS[rotid], x, y)
 							)
@@ -212,22 +222,31 @@ def init_state(read):
 
 zmienna_statyczna = [1]
 def loop():
-	if not hasattr(gs, 'world'):
-		gs.world = conn.describe()
+	print info('world')
+	gs.world = conn.describe()
 	global ROTS_ARRS
 	ROTS_ARRS = [ r2a(x) for x in ROTS ]
+	print info('jakie klocki')
 	gs.abids = conn.bricks()
 	for x in gs.abids:
 		if x not in gs.bricks:
+			print info('brak mi ' + str(x))
 			gs.bricks[x] = conn.brick(x)
+	print info('spogladam z gory')
 	gs.above = conn.above()
-	zrzucmy = max(gs.allposs(), key = lambda x: x[0])
-	print info('chce zrzucic ' + str(zrzucmy))
+	print info('szukam')
 	try:
-		conn.drop(zrzucmy[1])
-		print info('ok')
-	except Exception as e:
-		print e
+		zrzucmy = max(gs.allposs(), key = lambda x: x[0])
+	except ValueError:
+		info('nie znalazlem')
+		zrzucmy = None
+	if zrzucmy is not None:
+		print info('chce zrzucic ' + str(zrzucmy))
+		try:
+			print info(str(conn.drop(zrzucmy[1])) + ' pkt')
+			print 'osom'
+		except Exception as e:
+			print type(e)
 
 
 if __name__ == '__main__':
