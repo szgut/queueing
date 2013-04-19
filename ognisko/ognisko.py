@@ -13,7 +13,7 @@ def flatten(l):
 class Config(object):
 	def __init__(self, universum=1):
 		self.host = 'universum.dl24'
-		self.datafile = 'data'
+		self.datafile = 'data' + str(universum)
 		self.port = 20000+universum-1
 
 def print_ar(arr):
@@ -32,12 +32,18 @@ def print_sq(s):
 
 class Beetle(object):
 	def __init__(self, n):
+		self.closest = None
 		self.n = n
+		self.state = {}
+		self.state['act'] = 'idle'
+		self.state['route'] = [0, 0]
 		pass
 
 	def __repr__(self):
-		return ("B%i(%i, %i)\tst:%i busy:%i %s close: %s dir:%s" %
-			(self.n, self.x, self.y, self.sticks, self.busy, self.role, self.closest, self.direction))
+		l1 = ("B%i(%i, %i)\tst:%i busy:%i %s close: %s rt:%s" %
+			(self.n, self.x, self.y, self.sticks, self.busy, self.role, self.closest, self.state['route']))
+		l2 = repr(self.state)
+		return '\n'.join([l1, l2])
 
 	def f(self):
 		ar = [
@@ -52,6 +58,25 @@ class Beetle(object):
 				except KeyError:
 					pass
 		return ar
+
+	def step(self, conn):
+		if self.state['route'][0] > 0:
+			conn.move(self.n, 1, 0)
+			self.state['route'][0] -= 1
+		elif self.state['route'][0] < 0:
+			conn.move(self.n, -1, 0)
+			self.state['route'][0] += 1
+		elif self.state['route'][1] > 0:
+			conn.move(self.n, 0, 1)
+			self.state['route'][1] -= 1
+		elif self.state['route'][1] < 0:
+			conn.move(self.n, 0, -1)
+			self.state['route'][1] += 1
+
+	@property
+	def my_field(self):
+		return self.fields[0, 0]
+
 
 
 class Map(object):
@@ -74,6 +99,15 @@ class Map(object):
 	def update(self, fields):
 		for f in fields:
 			self[f.x, f.y] = f
+
+	def get_islands(self):
+		for j in range(0, self.dim):
+			for i in range(0, self.dim):
+				if self[i, j] is None:
+					continue
+				if self[i, j].t == 'LAND':
+					yield self[i, j]
+
 
 	def dump(self):
 		lands = []
@@ -109,8 +143,14 @@ class Field(object):
 
 
 	@staticmethod
+	def dist_key(f, x, y):
+		if f.sticks - f.mysticks == 0:
+			return 1000
+		else:
+			return abs(f.x - x) + abs(f.y - y)
+	@staticmethod
 	def dist_from(x, y):
-		return lambda f: abs(f.x - x) + abs(f.y - y)
+		return lambda f: Field.dist_key(f, x, y)
 
 
 class Connection(dl24.connection.Connection):
@@ -199,70 +239,105 @@ def parse_args():
 		help="do not load initial state from dump file", dest='loadstate')
 	return parser.parse_args()
 
+
+class State:
+	def __init__(self):
+		pass
+
 def init_state(read):
-	global global_sth
+	global glob
 	if read:
-		global_sth = serializer.load()
+		glob = serializer.load()
 	else:
-		global_sth = 0
+		glob = State()
 
 
-zmienna_statyczna = [1]
-def loop():
-	# ~import time
-	# ~print "."
-	zmienna_statyczna[0] += 1
+def loop(load_state):
 	d = conn.desc()
 	t = conn.ttr()
 	beetle_nos = list(conn.ls())
 	beetles = [conn.info(no) for no in beetle_nos]
+	if load_state:
+		for b in beetles:
+			b.state = glob.bstates[b.n]
 	print(d)
 	print(t)
-	fields = flatten([conn.ls_wood(b.n) for b in beetles])
-	m = Map(d['N'])
-	m.update(fields)
+	if not load_state:
+		glob.m = Map(d['N'])
+	for b in beetles:
+		if b.my_field.t == 'LAND':
+			glob.m.update(conn.ls_wood(b.n))
+	isl = list(glob.m.get_islands())
 
 	for b in beetles:
-		b.closest = min(filter(lambda f: (f.x, f.y) != (b.x, b.y), fields), key = Field.dist_from(b.x, b.y))
-		b.direction = (b.closest.x - b.x, b.closest.y - b.y)
-		if b.direction[0] > 0:
-			conn.move(b.n, 1, 0)
-		elif b.direction[0] < 0:
-			conn.move(b.n, -1, 0)
-		elif b.direction[1] > 0:
-			conn.move(b.n, 0, 1)
-		elif b.direction[1] < 0:
-			conn.move(b.n, 0, -1)
+		if b.role == 'NONE':
+			if b.state['act'] == 'idle':
+				if b.my_field.t == 'LAND':
+					b.closest = min(filter(lambda f: (f.x, f.y) != (b.x, b.y), isl), key = Field.dist_from(b.x, b.y))
+					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
+					b.state['target'] = (b.x, b.y)
+					b.state['act'] = 'take_wood'
+				else:
+					b.closest = min(filter(lambda f: (f.x, f.y) != (b.x, b.y), isl), key = Field.dist_from(b.x, b.y))
+					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
+					b.state['act'] = 'rescue'
+			elif b.state['act'] == 'take_wood':
+				if b.state['route'] == [0, 0]:
+					try:
+						conn.take(b.n)
+					except Exception as e:
+						print(e)
+					b.state['act'] = 'go_back'
+					b.state['route'] = [b.state['target'][0] - b.x, b.state['target'][1] - b.y]
+				else:
+					b.step(conn)
+			elif b.state['act'] == 'go_back':
+				if b.state['route'] == [0, 0]:
+					try:
+						conn.give(b.n)
+					except Exception as e:
+						print(e)
+					b.state['act'] = 'idle'
+				else:
+					b.step(conn)
+			elif b.state['act'] == 'rescue':
+				if b.my_field.t == 'LAND': # saved!
+					b.state['act'] = 'idle'
+				else:
+					b.step(conn)
 
 
 	print_ar(beetles)
 
-	lands, waters = m.dump()
+	lands, waters = glob.m.dump()
 	write_file('lands', lands)
 	write_file('waters', waters)
 	write_file('beetles', dump_beetles(beetles))
+	glob.bstates = {}
+	for b in beetles:
+		glob.bstates[b.n] = b.state
 	# ~time.sleep(3)
 
 
 if __name__ == '__main__':
 	args = parse_args()
 	config = Config(args.universum)
-	global universum 
+	global universum
 	universum = args.universum
 	serializer = Serializer(config.datafile)
 	conn = Connection(config.host, config.port)
 	print info("logged in")
 
 	init_state(args.loadstate)
-	global_sth += 1
-	print global_sth
 	
 	try: # main loop
+		loop(args.loadstate)
+		conn.wait()
 		while 1:
-			loop()
+			loop(True)
 			conn.wait()
 	except KeyboardInterrupt:
-		serializer.save(global_sth)
+		serializer.save(glob)
 	except:
 		traceback.print_exc()
-		serializer.save(global_sth, ".crash")
+		serializer.save(glob, ".crash")
