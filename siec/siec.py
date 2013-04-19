@@ -9,15 +9,36 @@ import traceback
 
 class Config(object):
 	def __init__(self, universum=1):
-		self.host = 'localhost'
+		self.host = 'universum.dl24'
 		self.datafile = 'data'
-		self.port = 20000+universum-1
+		self.port = 20002+universum-1
+		self.limitD = 1000 if universum == 2 else None
 
 class Connection(dl24.connection.Connection):
 	# implementacja komend z zadania
-	def dupa(self):
-		self.cmd_dupa(3, [4, 5])
-		return self.readints(2)
+	
+	def time_to_request(self):
+		self.cmd("TIME_TO_REQUEST")
+		return self.readint()
+	
+	def request(self, i, j):
+		self.cmd("REQUEST", i, j)
+
+	def _get_requests(self):
+		s = self.readint()
+		l = []
+		for _ in xrange(s):
+			l.append((self.readint(), self.readint()))
+		return l
+
+	def my_requests(self):
+		self.cmd("MY_REQUESTS")
+		return self._get_requests()
+	
+	def last_obtained(self):
+		self.cmd("LAST_OBTAINED")
+		return [self._get_requests() for _ in xrange(5)]
+
 
 
 def parse_args():
