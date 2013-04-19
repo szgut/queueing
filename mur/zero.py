@@ -136,7 +136,6 @@ class Connection(dl24.connection.Connection):
 	
 	def above(self):
 		self.cmd_view_from_above()
-		print gs.world.X, gs.world.Y
 		li = [ [conn.readint() for x in range(gs.world.X)] for x in range(gs.world.Y)]
 		li.reverse()
 		return np.matrix(li)
@@ -243,7 +242,7 @@ def loop():
 	if zrzucmy is not None:
 		print info('chce zrzucic ' + str(zrzucmy))
 		try:
-			print info(str(conn.drop(zrzucmy[1])) + ' pkt')
+			print good(str(conn.drop(zrzucmy[1])) + ' pkt')
 			print 'osom'
 		except Exception as e:
 			print type(e)
