@@ -269,6 +269,8 @@ def loop():
 			break
 		except RejectedBrick:
 			pass
+		except:
+			pass
 	if olid == lid:
 		lista = lista[zuzylem:]
 
