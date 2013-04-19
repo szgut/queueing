@@ -7,6 +7,8 @@ from dl24.colors import warn, bad, good, info
 import argparse
 import traceback
 
+from random import randint
+
 def flatten(l):
 	return sum(l, [])
 
@@ -286,13 +288,15 @@ def loop(load_state):
 	isl = list(glob.m.get_islands())
 
 	glob.max_sticks = max(map(lambda i: i[2], t['islands']))
-	glob.max_island = max(t['islands'], key = lambda i: i[2])
-	fbest = Field(glob.max_island[0], glob.max_island[1])
-	fbest.t = 'LAND'
-	fbest.sticks = glob.max_island[2]
-	fbest.mysticks = 0
-	glob.m.update([fbest])
-	glob.max_island = glob.m[glob.max_island[0], glob.max_island[1]]
+	max_island_ = max(t['islands'], key = lambda i: i[2])
+	if glob.m[max_island_[0], max_island_[1]] is None:
+		fbest = Field(max_island_[0], max_island_[1])
+		fbest.t = 'LAND'
+		fbest.sticks = max_island_[2]
+		fbest.mysticks = 0
+		glob.m.update([fbest])
+	glob.max_island = glob.m[max_island_[0], max_island_[1]]
+	glob.max_island.sticks = max_island_[2]
 
 	#for b in beetles:
 	#	b.state['act'] = 'idle'
@@ -316,6 +320,9 @@ def loop(load_state):
 				pass
 		elif b.state['act'] == 'idle':
 			if b.my_field.t == 'LAND':
+				# from time to time sabotage
+				if b.role == 'CAPTAIN' and randint(0, 7) == 0:
+					pass
 				if b.role == 'NONE':
 					dist_w, sticks_w = 10, 1
 				else:
