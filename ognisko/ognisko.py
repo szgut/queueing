@@ -40,8 +40,12 @@ class Beetle(object):
 		pass
 
 	def __repr__(self):
-		l1 = ("B%i(%i, %i)\tst:%i busy:%i %s close: %s rt:%s" %
-			(self.n, self.x, self.y, self.sticks, self.busy, self.role, self.closest, self.state['route']))
+		if self.my_field.t == 'WATER':
+			l1 = ("B%i(%i, %i)\tst:%i busy:%i %s close: %s rt:%s" %
+				(self.n, self.x, self.y, self.sticks, self.busy, self.role, self.closest, self.state['route']))
+		else:
+			l1 = ("B%i(%i, %i) on island with %i sticks (%i not mine)" %
+				(self.n, self.x, self.y, glob.m[self.x, self.y].sticks, glob.m[self.x, self.y].sticks - glob.m[self.x, self.y].mysticks))
 		l2 = repr(self.state)
 		return '\n'.join([l1, l2])
 
@@ -90,11 +94,11 @@ class Map(object):
 			self.m.append(line)
 
 	def __getitem__(self, (x, y)):
-		return self.m[y][x]
+		return self.m[y-1][x-1]
 
 	def __setitem__(self, (x, y), o):
-		self.m[y][x] = o
-		return self.m[y][x]
+		self.m[y-1][x-1] = o
+		return self.m[y-1][x-1]
 
 	def update(self, fields):
 		for f in fields:
@@ -143,15 +147,17 @@ class Field(object):
 
 
 	@staticmethod
-	def dist_key(f, x, y):
+	def dist_key(f, x, y, dist_w, sticks_w):
+		dist = abs(f.x - x) + abs(f.y - y)
+		dist_n = (2*glob.m.dim - float(dist)) / (2*glob.m.dim)
+		sticks_n = (min(40, float(f.sticks) - f.mysticks)) / 40
 		if f.sticks - f.mysticks == 0:
-			return 1000
-		else:
-			dist = abs(f.x - x) + abs(f.y - y)
-			
+			return 0
+		return dist_w*dist_n + sticks_w*sticks_n
+
 	@staticmethod
-	def dist_from(x, y):
-		return lambda f: Field.dist_key(f, x, y)
+	def dist_from(x, y, dist_w, sticks_w):
+		return lambda f: Field.dist_key(f, x, y, dist_w, sticks_w)
 
 
 class Connection(dl24.connection.Connection):
@@ -273,23 +279,36 @@ def loop(load_state):
 			glob.m.update(conn.ls_wood(b.n))
 	isl = list(glob.m.get_islands())
 
+	glob.max_sticks = max(map(lambda i: i[2], t['islands']))
+
+	#for b in beetles:
+	#	b.state['act'] = 'idle'
 	for b in beetles:
 		if b.busy > 0:
 			continue
-		if b.state['act'] == 'idle':
+
+		# islands other than current
+		other_isl = filter(lambda f: (f.x, f.y) != (b.x, b.y), isl)
+
+		if glob.m[b.x, b.y] is not None and glob.m[b.x, b.y].sticks >= 100 and b.role == 'NONE':
+			try:
+				conn.build(b.n)
+				self.state['act'] = 'idle'
+			except Exception as e:
+				print(e)
+		elif b.state['act'] == 'idle':
 			if b.my_field.t == 'LAND':
-				if glob.m[b.x, b.y] is not None and glob.m[b.x, b.y].sticks >= 100 and b.role == 'NONE':
-					try:
-						conn.build(b.n)
-					except Exception as e:
-						print(e)
+				if b.role == 'NONE':
+					dist_w, sticks_w = 30, 1
 				else:
-					b.closest = max(filter(lambda f: (f.x, f.y) != (b.x, b.y), isl), key = Field.dist_from(b.x, b.y))
-					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
-					b.state['target'] = (b.x, b.y)
-					b.state['act'] = 'take_wood'
+					dist_w, sticks_w = 1, 1
+				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w))
+				b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
+				b.state['target'] = (b.x, b.y)
+				b.state['act'] = 'take_wood'
 			else:
-				b.closest = max(filter(lambda f: (f.x, f.y) != (b.x, b.y), isl), key = Field.dist_from(b.x, b.y))
+				dist_w, sticks_w = 1, 0
+				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w))
 				b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
 				b.state['act'] = 'rescue'
 		elif b.state['act'] == 'take_wood':
@@ -299,7 +318,12 @@ def loop(load_state):
 				except Exception as e:
 					print(e)
 				b.state['act'] = 'go_back'
-				b.state['route'] = [b.state['target'][0] - b.x, b.state['target'][1] - b.y]
+				if b.role == 'CAPTAIN':
+					dist_w, sticks_w = 1, 0
+					b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w))
+					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
+				else:
+					b.state['route'] = [b.state['target'][0] - b.x, b.state['target'][1] - b.y]
 			else:
 				b.step(conn)
 		elif b.state['act'] == 'go_back':
