@@ -9,6 +9,7 @@ from dl24.colors import warn, bad, good, info
 import argparse
 import traceback
 import numpy as np
+from datetime import datetime
 
 class RejectedBrick(Exception): pass
 class RejectedMatch(RejectedBrick): pass
@@ -220,27 +221,46 @@ def init_state(read):
 
 
 zmienna_statyczna = [1]
-def loop():
-	print info('world')
-	gs.world = conn.describe()
-	global ROTS_ARRS
-	ROTS_ARRS = [ r2a(x) for x in ROTS ]
-	print info('jakie klocki')
-	gs.abids = conn.bricks()
-	for x in gs.abids:
-		if x not in gs.bricks:
-			print info('brak mi ' + str(x))
-			gs.bricks[x] = conn.brick(x)
-	print info('spogladam z gory')
+natyle = 0
+def loop():	
+	global natyle
+	global lista
+	
+	print natyle
+	
+	with delay_sigint():
+		print info('world')
+		gs.world = conn.describe()
+		global ROTS_ARRS
+		ROTS_ARRS = [ r2a(x) for x in ROTS ]
+		print info('jakie klocki')
+		gs.abids = conn.bricks()
+		for x in gs.abids:
+			if x not in gs.bricks:
+				print info('brak mi ' + str(x))
+				gs.bricks[x] = conn.brick(x)
+		print info('spogladam z gory')
 	gs.above = conn.above()
 	print info('szukam')
-	for z in sorted(gs.allposs(), key = lambda x: -x[0])[:gs.world.R]:
+	if natyle == 0:
+		start = datetime.now()
+		lista = list(sorted(gs.allposs(), key = lambda x: -x[0]))
+		natyle = (datetime.now() - start).seconds / gs.world.T + 1
+		print info('wyszukiwanie na %s rund' % natyle)
+	natyle -= 1
+	print natyle
+	zuzylem = 0
+	for z in lista[:gs.world.R]:
+		zuzylem += 1
 		try:
 			print info('probuje zrzucic ' + str(z))
 			print good(str(conn.drop(z[1])) + ' pkt')
 			break
 		except RejectedBrick:
 			pass
+	lista = lista[zuzylem:]
+	if not lista:
+		natyle = 0
 
 
 if __name__ == '__main__':
@@ -253,9 +273,9 @@ if __name__ == '__main__':
 	init_state(args.loadstate)
 	
 	try: # main loop
+		conn.wait()
 		while 1:
-			with delay_sigint():
-				loop()
+			loop()
 			conn.wait()
 	except KeyboardInterrupt:
 		serializer.save(gs)
