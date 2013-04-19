@@ -7,6 +7,7 @@ from dl24.colors import warn, bad, good, info
 import argparse
 import traceback
 import collections
+import heapq
 
 class Config(object):
 	def __init__(self, universum=1):
@@ -39,7 +40,12 @@ class Connection(dl24.connection.Connection):
 		self.cmd("REQUEST", i, j)
 
 	def declare_plan(self, plan):
-		self.cmd("DECLARE_PLAN", len(plan), [(i+1,j+1) for i,j in plan])
+		try:
+			self.cmd("DECLARE_PLAN", len(plan), [(i+1,j+1) for i,j in plan])
+		except dl24.connection.CommandFailedError:
+			pass
+		else:
+			print good("plan accepted")
 
 	def _get_requests(self):
 		s = self.readint()
@@ -132,8 +138,6 @@ def owned():
 	points.extend(conn.my_requests())
 	return points
 
-def turn():
-	pass	
 
 
 def dumpfees(path="fees"):
@@ -187,18 +191,13 @@ def dfs_route(pointa, pointb):
 		yield Point(i, pointb.j)
 
 
-if __name__ == '__main__':
-	args = parse_args()
-	config = Config(args.universum)
-	serializer = Serializer(config.datafile)
-	conn = Connection(config.host, config.port)
-	print info("connected.")
+def dijkstra_dists(city):
+	done = set()
+	#reachable = 
 
-	new_world(args.loadstate)
-	print L,N,D
-	print conn.get_ranking()
-	print len(cities), N
 
+
+def solve():
 	plan = []
 	fu = FindUnion()
 	cities_dists = [(dfs_dist(a,b), a, b) for a in cities for b in cities]
@@ -207,33 +206,50 @@ if __name__ == '__main__':
 	for dist, a, b in cities_dists:
 		if not fu.same(a, b):
 			plan.extend(dfs_route(a, b))
-			print "joining", list(a), b
 			fu.merge(a,b)
 			mcount += 1
 	plan.extend(cities)
 	print mcount
 
-	dumppoints(cities, "cities")
-	dumppoints(set(plan), "plan")
+	# dumppoints(cities, "cities")
+	# dumppoints(set(plan), "plan")
 
 	conn.declare_plan(set(plan))
 
-	# print len(owned()), N
-	# print conn.get_ranking()
+
+def obtain_permission():
+	pass
+
+
+if __name__ == '__main__':
+	args = parse_args()
+	config = Config(args.universum)
+	serializer = Serializer(config.datafile)
+	conn = Connection(config.host, config.port)
+	print info("connected.")
+
+	new_world(args.loadstate)
+
+	print L,N,D
+	print conn.get_ranking()
 
 
 	time_left = conn.time_to_request()
 	try: # main loop
 		while 1:
-			turn()
-			
-			old_time_left = time_left
-			time_left = conn.time_to_request()
-			if time_left > old_time_left:
-				new_world()
-			else:
-				print time_left
-				conn.wait()
+			solve()
+
+			while 1:
+				obtain_permission()
+				
+				old_time_left = time_left
+				time_left = conn.time_to_request()
+				if time_left > old_time_left:
+					new_world()
+					break
+				else:
+					print time_left
+					conn.wait()
 
 	except KeyboardInterrupt:
 		serializer.save((L,N,D, fee, maxrequests))
