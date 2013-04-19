@@ -232,6 +232,7 @@ class Napykalacz(Thread):
 			try:
 				global lista
 				global lid
+				lid += 1
 				print info('szukam')
 				lista = list(sorted(gs.allposs(), key = lambda x: -x[0]))
 				print good('Nowa lista!')
@@ -266,6 +267,7 @@ def loop():
 	olid = lid
 	zuzylem = 0
 	for z in lista[:gs.world.R]:
+		zuzylem += 1
 		try:
 			print info('probuje zrzucic ' + str(z))
 			print good(str(conn.drop(z[1])) + ' pkt')
