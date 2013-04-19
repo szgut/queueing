@@ -197,7 +197,7 @@ def dfs_route(pointa, pointb):
 def dijkstra_dists(city):
 	done = set()
 	results = tdarr(lambda i,j: 10**9)
-	heap = [(0, city)]
+	heap = [(fee[city.i][city.j], city)]
 	while heap:
 		dist, pt = heapq.heappop(heap)
 		if results[pt.i][pt.j] < dist: continue
@@ -214,7 +214,12 @@ def dijkstra_dists(city):
 
 
 def dijkstra_route(results, city, dest):
-	
+	while city != dest:
+		dist_city = results[city.i][city.j]
+		for neigh in adjacent(city):
+			dist_neigh = results[neigh.i][neigh.j]
+			if dist_neigh +
+
 
 
 
@@ -223,11 +228,13 @@ def solve():
 	fu = FindUnion()
 	# cities_dists = [(dfs_dist(a,b), a, b) for a in cities for b in cities]
 	cities_dists = []
+	dijkstra_results = tdarr(lambda i,j: 0)
+	print "czekaj na dajkstrę..."
 	for a in cities:
 		dists_a = dijkstra_dists(a)
 		for b in cities:
 			cities_dists.append((dists_a[b.i][b.j], a, b))
-		print a
+		dijkstra_results[a.i][a.j] = dists_a
 
 	cities_dists.sort()
 	mcount = 0
