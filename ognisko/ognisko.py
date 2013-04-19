@@ -126,7 +126,7 @@ class Map(object):
 def dump_beetles(bet):
 	lines = []
 	for b in bet:
-		lines.append("%i %i" % (b.x, b.y))
+		lines.append("%i %i 0" % (b.x, b.y))
 	return '\n'.join(lines) + '\n'
 
 
@@ -147,7 +147,8 @@ class Field(object):
 		if f.sticks - f.mysticks == 0:
 			return 1000
 		else:
-			return abs(f.x - x) + abs(f.y - y)
+			dist = abs(f.x - x) + abs(f.y - y)
+			
 	@staticmethod
 	def dist_from(x, y):
 		return lambda f: Field.dist_key(f, x, y)
@@ -226,6 +227,9 @@ class Connection(dl24.connection.Connection):
 	def move(self, n, x, y):
 		self.cmd_move(n, x, y)
 
+	def build(self, n):
+		self.cmd_build(n)
+
 def write_file(f, t):
 	f = open('.'.join([str(universum), f]), "w")
 	f.write(t)
@@ -270,41 +274,48 @@ def loop(load_state):
 	isl = list(glob.m.get_islands())
 
 	for b in beetles:
-		if b.role == 'NONE':
-			if b.state['act'] == 'idle':
-				if b.my_field.t == 'LAND':
-					b.closest = min(filter(lambda f: (f.x, f.y) != (b.x, b.y), isl), key = Field.dist_from(b.x, b.y))
+		if b.busy > 0:
+			continue
+		if b.state['act'] == 'idle':
+			if b.my_field.t == 'LAND':
+				if glob.m[b.x, b.y] is not None and glob.m[b.x, b.y].sticks >= 100 and b.role == 'NONE':
+					try:
+						conn.build(b.n)
+					except Exception as e:
+						print(e)
+				else:
+					b.closest = max(filter(lambda f: (f.x, f.y) != (b.x, b.y), isl), key = Field.dist_from(b.x, b.y))
 					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
 					b.state['target'] = (b.x, b.y)
 					b.state['act'] = 'take_wood'
-				else:
-					b.closest = min(filter(lambda f: (f.x, f.y) != (b.x, b.y), isl), key = Field.dist_from(b.x, b.y))
-					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
-					b.state['act'] = 'rescue'
-			elif b.state['act'] == 'take_wood':
-				if b.state['route'] == [0, 0]:
-					try:
-						conn.take(b.n)
-					except Exception as e:
-						print(e)
-					b.state['act'] = 'go_back'
-					b.state['route'] = [b.state['target'][0] - b.x, b.state['target'][1] - b.y]
-				else:
-					b.step(conn)
-			elif b.state['act'] == 'go_back':
-				if b.state['route'] == [0, 0]:
-					try:
-						conn.give(b.n)
-					except Exception as e:
-						print(e)
-					b.state['act'] = 'idle'
-				else:
-					b.step(conn)
-			elif b.state['act'] == 'rescue':
-				if b.my_field.t == 'LAND': # saved!
-					b.state['act'] = 'idle'
-				else:
-					b.step(conn)
+			else:
+				b.closest = max(filter(lambda f: (f.x, f.y) != (b.x, b.y), isl), key = Field.dist_from(b.x, b.y))
+				b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
+				b.state['act'] = 'rescue'
+		elif b.state['act'] == 'take_wood':
+			if b.state['route'] == [0, 0]:
+				try:
+					conn.take(b.n)
+				except Exception as e:
+					print(e)
+				b.state['act'] = 'go_back'
+				b.state['route'] = [b.state['target'][0] - b.x, b.state['target'][1] - b.y]
+			else:
+				b.step(conn)
+		elif b.state['act'] == 'go_back':
+			if b.state['route'] == [0, 0]:
+				try:
+					conn.give(b.n)
+				except Exception as e:
+					print(e)
+				b.state['act'] = 'idle'
+			else:
+				b.step(conn)
+		elif b.state['act'] == 'rescue':
+			if b.my_field.t == 'LAND': # saved!
+				b.state['act'] = 'idle'
+			else:
+				b.step(conn)
 
 
 	print_ar(beetles)
