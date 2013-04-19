@@ -181,7 +181,7 @@ class State(object):
 				himap.fill(0)
 				shadow.fill(0)
 				ones.fill(1)
-				volume = 0
+				
 				for z in range(D):
 					for y in range(D):
 						for x in range(D):
