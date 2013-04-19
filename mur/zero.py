@@ -10,6 +10,7 @@ import argparse
 import traceback
 import numpy as np
 from datetime import datetime
+from threading import Thread
 
 class RejectedBrick(Exception): pass
 class RejectedMatch(RejectedBrick): pass
@@ -220,14 +221,20 @@ def init_state(read):
 		gs = State()
 
 
+class Napykalacz(Thread):
+	def run(self):
+		while True:
+			global lista
+			global lid
+			print info('szukam')
+			lista = list(sorted(gs.allposs(), key = lambda x: -x[0]))
+			print good('Nowa lista!')
+
 zmienna_statyczna = [1]
-natyle = 0
+napykalam = False
+lid = 0
+lista = []
 def loop():	
-	global natyle
-	global lista
-	
-	print natyle
-	
 	with delay_sigint():
 		print info('world')
 		gs.world = conn.describe()
@@ -239,28 +246,26 @@ def loop():
 			if x not in gs.bricks:
 				print info('brak mi ' + str(x))
 				gs.bricks[x] = conn.brick(x)
-		print info('spogladam z gory')
+	
+	print info('spogladam z gory')
 	gs.above = conn.above()
-	print info('szukam')
-	if natyle == 0:
-		start = datetime.now()
-		lista = list(sorted(gs.allposs(), key = lambda x: -x[0]))
-		natyle = (datetime.now() - start).seconds / gs.world.T + 1
-		print info('wyszukiwanie na %s rund' % natyle)
-	natyle -= 1
-	print natyle
+	
+	global napykalam
+	global lista
+	if napykalam == False:
+		Napykalacz().start()
+		napykalam = True
+	olid = lid
 	zuzylem = 0
 	for z in lista[:gs.world.R]:
-		zuzylem += 1
 		try:
 			print info('probuje zrzucic ' + str(z))
 			print good(str(conn.drop(z[1])) + ' pkt')
 			break
 		except RejectedBrick:
 			pass
-	lista = lista[zuzylem:]
-	if not lista:
-		natyle = 0
+	if olid == lid:
+		lista = lista[zuzylem:]
 
 
 if __name__ == '__main__':
