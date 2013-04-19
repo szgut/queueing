@@ -37,8 +37,8 @@ class Connection(dl24.connection.Connection):
 		self.cmd("TIME_TO_REQUEST")
 		return self.readint()
 	
-	def request(self, i, j):
-		self.cmd("REQUEST", i, j)
+	def request(self, point):
+		self.cmd("REQUEST", point.i+1, point.j+1)
 
 	def declare_plan(self, plan):
 		try:
@@ -146,19 +146,20 @@ def make_graph():
 
 
 
-def owned():
-	points = list(cities)
-	points.extend(conn.my_requests())
-	return points
+
 
 
 
 def dumpsplot(items, path):
 	with open(path, 'w') as f:
 		for i,j in allij():
-				if items[i][i] == 10**9:
-					print Point(i,j)
 				print>>f, i, j, items[i][j]
+
+def dumpfees(plan, path):
+	with open(path, 'w') as f:
+		for i,j in plan:
+			print>>f, i, j, fee[i][j]
+
 
 
 def dumppoints(items, path):
@@ -182,11 +183,14 @@ def dfs_route(pointa, pointb):
 	for i in xrange(pointa.i+di, pointb.i, di):
 		yield Point(i, pointb.j)
 
+def fee1(city):
+	return fee[city.i][city.j] or 1
 
 def dijkstra_dists(city):
 	done = set()
 	results = tdarr(lambda i,j: 10**9)
-	heap = [(fee[city.i][city.j], city)]
+	results[city.i][city.j] = fee1(city)
+	heap = [(fee1(city), city)]
 	while heap:
 		dist, pt = heapq.heappop(heap)
 		if results[pt.i][pt.j] < dist: continue
@@ -194,7 +198,7 @@ def dijkstra_dists(city):
 
 		for neigh in adjacent(pt):
 			if neigh in done: continue
-			nneighdist = dist + fee[neigh.i][neigh.j]
+			nneighdist = dist + fee1(neigh)
 			if nneighdist < results[neigh.i][neigh.j]:
 				results[neigh.i][neigh.j] = nneighdist
 				heapq.heappush(heap, (nneighdist, neigh))
@@ -202,32 +206,50 @@ def dijkstra_dists(city):
 	return results
 
 
-def dijkstra_route(results, city, dest):
+def dijkstra_route(city, dest):
+	results = dijkstras[dest.i][dest.j]
 	while city != dest:
 		dist_city = results[city.i][city.j]
+		# print city, dist_city, fee[city.i][city.j]
+		# nexts = []
 		for neigh in adjacent(city):
 			dist_neigh = results[neigh.i][neigh.j]
-			if dist_neigh + fee[city.i][city.j] == dist_city:
+			# print "NEIGH", neigh, dist_neigh
+			if dist_neigh + fee1(city) == dist_city:
+				# nexts.append(neigh)
 				yield neigh
 				city = neigh
-				break
+		# print "nexts", nexts, [fee[point.i][point.j] for point in nexts]
+		# if not nexts:
+		# 	print warn("nexts empty :(")
+		# elif len(nexts)>1:
+		# 	nexts = [(fee[point.i][point.j]==0, dfs_dist(point, dest), point) for point in nexts]
+		# 	nexts.sort()
+		# 	nexts = [nexts[0][2]]
+		# yield nexts[0]
+		# city = nexts[0]
+
 		# print "not found"
 
+def dot():
+	sys.stdout.write(".")
+	sys.stdout.flush()
 
 def compute_dijkstras():
 	results = tdarr(lambda i,j: 0)
 	print "czekaj na dajkstrę..."
 	for a in cities:
 		results[a.i][a.j] = dijkstra_dists(a)
-		sys.stdout.write(".")
-		sys.stdout.flush()
+		dot()
+	print
 	return results
 
 
 def solve():
-	plan = []
+	global used_points
 	fu = FindUnion()
-	# cities_dists = [(dfs_dist(a,b), a, b) for a in cities for b in cities]
+	
+	# licz odległości między wszystkimi parami miast
 	cities_dists = []
 	for a in cities:
 		dists_a = dijkstras[a.i][a.j]
@@ -236,31 +258,51 @@ def solve():
 	cities_dists.sort()
 
 	# dumpsplot(dijkstra_results[cities[0].i][cities[0].j], "dists")
-	print cities[0]
 
 	print "\nczekaj na routy..."
+	plan = []
 	for dist, a, b in cities_dists:
 		if not fu.same(a, b):
-			plan.extend(dfs_route(a, b))
+			#plan.extend(dfs_route(a, b))
+			plan.extend(dijkstra_route(a, b))
+			dot()
 			# plan.extend(dijkstra_route(dijkstra_results[b.i][b.j], a, b))
 			fu.merge(a,b)
+	print
 	plan.extend(cities)
 	plan = set(plan)
 
+	dumpfees(plan, "fees")
 	dumppoints(cities, "cities")
 	dumppoints(plan, "plan")
 
 	conn.declare_plan(plan)
 
+	used_points = sorted(plan, key=fee1)
+
 
 def obtain_permission():
-	pass
+	while used_points:
+		point = used_points.pop()
+		if point in permissions:
+			continue
+		try:
+			print "trying", point
+			conn.request(point)
+		except dl24.connection.CommandFailedError:
+			pass
+		else:
+			permissions.add(point)
+			print good("obtained permission for %s worth %d" % (str(point), fee1(point)))
+			return
+	print "no more used_points"
+
 
 
 
 def new_world(loadstate=False):
 	global L,N,D,fee,maxrequests,dijkstras
-	global cities
+	global cities, permissions
 	print info("new world")
 	
 	if loadstate:
@@ -268,9 +310,19 @@ def new_world(loadstate=False):
 	else:
 		(L,N,D,C,W,T,K), fee, maxrequests = conn.describe_world()
 	
+	print "params:", L, N, D
 	cities = [Point(i, j) for i,j in allij() if fee[i][j] == 0]
+	
+	permissions = set(cities)
+	for point in conn.my_requests():
+		permissions.add(point)
+		
 	if not loadstate:
 		dijkstras = compute_dijkstras()
+
+
+def ddist(a, b):
+	return dijkstras[a.i][a.j][b.i][b.j]
 
 if __name__ == '__main__':
 	args = parse_args()
@@ -280,9 +332,6 @@ if __name__ == '__main__':
 	print info("connected.")
 
 	new_world(args.loadstate)
-
-	print L,N,D
-	print conn.get_ranking()
 
 
 	time_left = conn.time_to_request()
