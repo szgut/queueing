@@ -7,6 +7,9 @@ from dl24.colors import warn, bad, good, info
 import argparse
 import traceback
 
+def flatten(l):
+	return sum(l, [])
+
 class Config(object):
 	def __init__(self, universum=1):
 		self.host = 'universum.dl24'
@@ -33,7 +36,8 @@ class Beetle(object):
 		pass
 
 	def __repr__(self):
-		  return "B%i(%i, %i)\tst:%i busy:%i %s" % (self.n, self.x, self.y, self.sticks, self.busy, self.role)
+		return ("B%i(%i, %i)\tst:%i busy:%i %s close: %s dir:%s" %
+			(self.n, self.x, self.y, self.sticks, self.busy, self.role, self.closest, self.direction))
 
 	def f(self):
 		ar = [
@@ -51,13 +55,46 @@ class Beetle(object):
 
 
 class Map(object):
-	def __init__(self, x, y):
+	def __init__(self, dim):
+		self.dim = dim
 		self.m = []
-		for i in range(0, y):
+		for j in range(0, self.dim):
 			line = []
-			for j in range(0, x):
-				line.append(Field(j, i))
+			for i in range(0, self.dim):
+				line.append(None)
 			self.m.append(line)
+
+	def __getitem__(self, (x, y)):
+		return self.m[y][x]
+
+	def __setitem__(self, (x, y), o):
+		self.m[y][x] = o
+		return self.m[y][x]
+
+	def update(self, fields):
+		for f in fields:
+			self[f.x, f.y] = f
+
+	def dump(self):
+		lands = []
+		waters = []
+		for j in range(0, self.dim):
+			for i in range(0, self.dim):
+				if self[i, j] is None:
+					continue
+				if self[i, j].t == 'LAND':
+					lands.append("%i %i %i" % (i, j, self[i, j].sticks))
+				else:
+					waters.append("%i %i %i" % (i, j))
+
+		return '\n'.join(lands) + '\n', '\n'.join(waters) + '\n'
+
+def dump_beetles(bet):
+	lines = []
+	for b in bet:
+		lines.append("%i %i" % (b.x, b.y))
+	return '\n'.join(lines) + '\n'
+
 
 class Field(object):
 	def __init__(self, x = 0, y = 0):
@@ -69,6 +106,11 @@ class Field(object):
 
 	def __str__(self):
 		return "%s(%i, %i) st:%i, my:%i" % (repr(self), self.x, self.y, self.sticks, self.mysticks)
+
+
+	@staticmethod
+	def dist_from(x, y):
+		return lambda f: abs(f.x - x) + abs(f.y - y)
 
 
 class Connection(dl24.connection.Connection):
@@ -132,9 +174,22 @@ class Connection(dl24.connection.Connection):
 			fs.append(Field())
 			fs[-1].x, fs[-1].y = self.readints(2)
 			fs[-1].sticks, fs[-1].mysticks = self.readints(2)
-			fs[-1].t = 'WATER'
+			fs[-1].t = 'LAND'
 		return fs
 
+	def take(self, n):
+		self.cmd_take(n)
+
+	def give(self, n):
+		self.cmd_give(n)
+
+	def move(self, n, x, y):
+		self.cmd_move(n, x, y)
+
+def write_file(f, t):
+	f = open('.'.join([str(universum), f]), "w")
+	f.write(t)
+	f.close()
 
 def parse_args():
 	parser = argparse.ArgumentParser()
@@ -163,17 +218,37 @@ def loop():
 	beetles = [conn.info(no) for no in beetle_nos]
 	print(d)
 	print(t)
+	fields = flatten([conn.ls_wood(b.n) for b in beetles])
+	m = Map(d['N'])
+	m.update(fields)
+
+	for b in beetles:
+		b.closest = min(filter(lambda f: (f.x, f.y) != (b.x, b.y), fields), key = Field.dist_from(b.x, b.y))
+		b.direction = (b.closest.x - b.x, b.closest.y - b.y)
+		if b.direction[0] > 0:
+			conn.move(b.n, 1, 0)
+		elif b.direction[0] < 0:
+			conn.move(b.n, -1, 0)
+		elif b.direction[1] > 0:
+			conn.move(b.n, 0, 1)
+		elif b.direction[1] < 0:
+			conn.move(b.n, 0, -1)
+
+
 	print_ar(beetles)
-	print_sq(beetles[0].f())
-	fields = conn.ls_wood(beetle_nos[0])
-	for f in fields:
-		print(str(f))
+
+	lands, waters = m.dump()
+	write_file('lands', lands)
+	write_file('waters', waters)
+	write_file('beetles', dump_beetles(beetles))
 	# ~time.sleep(3)
 
 
 if __name__ == '__main__':
 	args = parse_args()
 	config = Config(args.universum)
+	global universum 
+	universum = args.universum
 	serializer = Serializer(config.datafile)
 	conn = Connection(config.host, config.port)
 	print info("logged in")
