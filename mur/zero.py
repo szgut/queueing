@@ -165,9 +165,14 @@ class State(object):
 		Z = self.world.Z
 		for bid in self.abids:
 			brick = self.bricks[bid]
-						
+			
+			bylo = set()
+			
 			for rotid in range(len(ROTS_ARRS)):
 				rorbri = rot(brick.d, ROTS_ARRS[rotid])
+				if (str(rorbri) in bylo):
+					continue
+				bylo.add(str(rorbri))
 				volume = rorbri.sum()
 				
 				himap = np.empty([D, D], dtype=int)
@@ -223,7 +228,7 @@ def init_state(read):
 
 class Napykalacz(Thread):
 	def run(self):
-		while True:
+		while napykalam:
 			global lista
 			global lid
 			print info('szukam')
@@ -253,8 +258,8 @@ def loop():
 	global napykalam
 	global lista
 	if napykalam == False:
-		Napykalacz().start()
 		napykalam = True
+		Napykalacz().start()
 	olid = lid
 	zuzylem = 0
 	for z in lista[:gs.world.R]:
@@ -287,6 +292,7 @@ if __name__ == '__main__':
 	except:
 		traceback.print_exc()
 		serializer.save(gs, ".crash")
+	napykalam = False
 
 else:
 	gs = State()
