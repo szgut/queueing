@@ -4,8 +4,9 @@ import signal
 import contextlib
 import cPickle as pickle
 import colors
+import time
 
-def insist(exception=KeyboardInterrupt):
+def insist(exception=KeyboardInterrupt, wait=None):
 	def decorator(fun):
 		@functools.wraps(fun)
 		def wrapper(*args, **kwargs):
@@ -14,6 +15,8 @@ def insist(exception=KeyboardInterrupt):
 					return fun(*args, **kwargs)
 				except exception:
 					print colors.bad("retrying %s...\n" % fun.__name__)
+					if wait is not None:
+						time.sleep(wait)
 		return wrapper
 	return decorator
 

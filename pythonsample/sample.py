@@ -36,11 +36,13 @@ def init_state(read):
 		global_sth = 0
 
 
-
+zmienna_statyczna = [1]
 def loop():
-	import time
-	print "."
-	time.sleep(3)
+	# ~import time
+	# ~print "."
+	zmienna_statyczna[0] += 1
+	conn.cmd_dupa(zmienna_statyczna[0])
+	# ~time.sleep(3)
 
 
 if __name__ == '__main__':
@@ -48,7 +50,6 @@ if __name__ == '__main__':
 	config = Config(args.universum)
 	serializer = Serializer(config.datafile)
 	conn = Connection(config.host, config.port)
-	conn.login()
 	print info("logged in")
 
 	init_state(args.loadstate)
