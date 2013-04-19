@@ -6,12 +6,11 @@ import misc
 	
 class CommandFailedError(Exception):
 	def __new__(cls, msg, errno=None):
-		exceptions = {6: CommandLimitError, 7: ForcedWaitingError}
+		exceptions = {6: ForcedWaitingError}
 		return super(CommandFailedError, cls).__new__(exceptions.get(errno, cls))
 	def __init__(self, msg, errno=None):
 		super(CommandFailedError, self).__init__(msg)
 		self.errno = errno
-class CommandLimitError(CommandFailedError): pass
 class ForcedWaitingError(CommandFailedError): pass
 
 class ConnectionResetError(Exception): pass
