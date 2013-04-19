@@ -14,18 +14,17 @@ class CommandFailedError(Exception):
 class CommandLimitError(CommandFailedError): pass
 class ForcedWaitingError(CommandFailedError): pass
 
-class ConnectionLostError(Exception): pass
+class ConnectionResetError(Exception): pass
 
 # tcp
 class Connection(object):
+		
 	def __init__(self, host='localhost', port=20003):
-		'''connect to server'''
-		s = socket.socket()
-		s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-		s.connect((host,port))
-		self.f = s.makefile('rw', 1)
-		s.close()
-	
+		self._host = host
+		self._port = port
+		self._connectNlogin()
+
+
 	def __getattr__(self, name):
 		'''cmd_STH forward to cmd(), else forward to self.f'''
 		if name.startswith("cmd_"):
@@ -34,12 +33,14 @@ class Connection(object):
 			return clo 
 		else:
 			return getattr(self.f, name)
-				
+	
 	def _catch_read(self, fun):
 		try: return fun(self)
 		except EOFError:
 			print warn("połączenie zerwane")
-			raise ConnectionLostError
+			self._connectNlogin()
+			raise ConnectionResetError
+	
 	def readint(self):   return self._catch_read(scanf.readint)
 	def readfloat(self): return self._catch_read(scanf.readfloat)
 	def readstr(self):   return self._catch_read(scanf.readstr)
@@ -73,9 +74,23 @@ class Connection(object):
 
 	def writeln(self, *what):
 		self.write(" ".join(map(str, misc.flatten(what))) +"\n")
+
 	
+	def _connect(self):
+		'''connect to server'''
+		s = socket.socket()
+		s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+		s.connect((self._host, self._port))
+		self.f = s.makefile('rw', 1)
+		s.close()
 	
-	def login(self, name="team13", password="efemztzlxt"):
+	@misc.insist((EOFError, socket.error), 2)
+	def _connectNlogin(self):
+		self._connect()
+		self._login()
+		
+	
+	def _login(self, name="team13", password="efemztzlxt"):
 		'''login to server'''
 		self._readstr_assert('LOGIN')
 		self.writeln(name)
@@ -88,7 +103,7 @@ class Connection(object):
 		self.writeln(*what)
 		try:
 			self._read_ack()
-		except (CommandLimitError, ForcedWaitingError):
+		except (CommandLimitError, ForcedWaitingError, ConnectionResetError):
 			self.cmd(*what)	# repeat the command
 
 
