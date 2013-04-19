@@ -234,18 +234,13 @@ def loop():
 	print info('spogladam z gory')
 	gs.above = conn.above()
 	print info('szukam')
-	try:
-		zrzucmy = max(gs.allposs(), key = lambda x: x[0])
-	except ValueError:
-		info('nie znalazlem')
-		zrzucmy = None
-	if zrzucmy is not None:
-		print info('chce zrzucic ' + str(zrzucmy))
+	for z in sorted(gs.allposs(), key = lambda x: -x[0])[:gs.world.R]:
 		try:
-			print good(str(conn.drop(zrzucmy[1])) + ' pkt')
-			print 'osom'
-		except Exception as e:
-			print type(e)
+			print info('probuje zrzucic ' + str(z))
+			print good(str(conn.drop(z[1])) + ' pkt')
+			break
+		except RejectedBrick:
+			pass
 
 
 if __name__ == '__main__':
