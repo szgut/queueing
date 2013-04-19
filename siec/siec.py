@@ -6,6 +6,7 @@ from dl24.misc import delay_sigint
 from dl24.colors import warn, bad, good, info
 import argparse
 import traceback
+import collections
 
 class Config(object):
 	def __init__(self, universum=1):
@@ -19,12 +20,24 @@ class Connection(dl24.connection.Connection):
 		super(Connection, self).__init__(host, port)
 	# implementacja komend z zadania
 	
+	def describe_world(self):
+		self.cmd("DESCRIBE_WORLD")
+		params = self.readints(6)
+		params.append(self.readfloat())
+		L = params[0]
+		fees = [self.readints(L) for _ in xrange(L)]
+		maxrequests = [self.readints(L) for _ in xrange(L)]
+		return (params, fees, maxrequests)
+
 	def time_to_request(self):
 		self.cmd("TIME_TO_REQUEST")
 		return self.readint()
 	
 	def request(self, i, j):
 		self.cmd("REQUEST", i, j)
+
+	def declare_plan(self, plan):
+		self.cmd("DECLARE_PLAN", len(plan), "\n", plan)
 
 	def _get_requests(self):
 		s = self.readint()
@@ -41,6 +54,10 @@ class Connection(dl24.connection.Connection):
 		self.cmd("LAST_OBTAINED")
 		return [self._get_requests() for _ in xrange(5)]
 
+	def get_ranking(self):
+		self.cmd("GET_RANKING")
+		s = self.readint()
+		return self.readints(s)
 
 
 def parse_args():
@@ -51,40 +68,61 @@ def parse_args():
 		help="do not load initial state from dump file", dest='loadstate')
 	return parser.parse_args()
 
-def init_state(read):
-	global global_sth
-	if read:
-		global_sth = serializer.load()
+####################################################################################################
+
+def new_world():
+	global L,N,D,fees,maxrequests
+	print info("new world")
+	(L,N,D,C,W,T,K), fees, maxrequests = conn.describe_world()
+
+def init_state(loadstate):
+	global L,N,D,fees,maxrequests
+	if loadstate:
+		L,N,D, fees, maxrequests = serializer.load()
 	else:
-		global_sth = 0
+		new_world()
+		
 
 
-zmienna_statyczna = [1]
-def loop():
-	# ~import time
-	# ~print "."
-	zmienna_statyczna[0] += 1
-	conn.cmd_dupa(zmienna_statyczna[0])
-	# ~time.sleep(3)
+Place = collections.namedtuple('Place', ['i', 'j'])
+def dist(placea, placeb):
+	pass
 
+
+def turn():
+	pass	
+
+
+def dumpfees(path="fees"):
+	with open(path, 'w') as f:
+		for i in xrange(L):
+			for j in xrange(L):
+				if fees[i][j] < 400:
+					print>>f, i, j, fees[i][j]
 
 if __name__ == '__main__':
 	args = parse_args()
 	config = Config(args.universum)
 	serializer = Serializer(config.datafile)
 	conn = Connection(config.host, config.port)
-	print info("logged in")
+	print info("connected.")
 
 	init_state(args.loadstate)
-	global_sth += 1
-	print global_sth
-	
+	print L,N,D
+	# dumpfees()
+
 	try: # main loop
 		while 1:
-			loop()
-			conn.wait()
+			turn()
+			old_time_left = time_left
+			time_left = conn.time_to_request()
+			if time_left > old_time_left
+				new_world()
+			else:
+				time_left = curr_time_left
+				conn.wait()
 	except KeyboardInterrupt:
-		serializer.save(global_sth)
+		serializer.save((L,N,D, fees, maxrequests))
 	except:
 		traceback.print_exc()
-		serializer.save(global_sth, ".crash")
+		serializer.save((L,N,D, fees, maxrequests), ".crash")
