@@ -147,17 +147,20 @@ class Field(object):
 
 
 	@staticmethod
-	def dist_key(f, x, y, dist_w, sticks_w):
+	def dist_key(f, x, y, dist_w, sticks_w, cutoff):
 		dist = abs(f.x - x) + abs(f.y - y)
 		dist_n = (2*glob.m.dim - float(dist)) / (2*glob.m.dim)
-		sticks_n = (min(40, float(f.sticks) - f.mysticks)) / 40
+		if cutoff:
+			sticks_n = (min(40, float(f.sticks) - f.mysticks)) / 40
+		else:
+			sticks_n = (float(f.sticks) - f.mysticks) / glob.max_sticks
 		if f.sticks - f.mysticks == 0:
 			return 0
 		return dist_w*dist_n + sticks_w*sticks_n
 
 	@staticmethod
-	def dist_from(x, y, dist_w, sticks_w):
-		return lambda f: Field.dist_key(f, x, y, dist_w, sticks_w)
+	def dist_from(x, y, dist_w, sticks_w, cutoff):
+		return lambda f: Field.dist_key(f, x, y, dist_w, sticks_w, cutoff)
 
 
 class Connection(dl24.connection.Connection):
@@ -236,6 +239,9 @@ class Connection(dl24.connection.Connection):
 	def build(self, n):
 		self.cmd_build(n)
 
+	def ignition(self, n):
+		self.cmd_ignition(n)
+
 def write_file(f, t):
 	f = open('.'.join([str(universum), f]), "w")
 	f.write(t)
@@ -280,6 +286,13 @@ def loop(load_state):
 	isl = list(glob.m.get_islands())
 
 	glob.max_sticks = max(map(lambda i: i[2], t['islands']))
+	glob.max_island = max(t['islands'], key = lambda i: i[2])
+	fbest = Field(glob.max_island[0], glob.max_island[1])
+	fbest.t = 'LAND'
+	fbest.sticks = glob.max_island[2]
+	fbest.mysticks = 0
+	glob.m.update([fbest])
+	glob.max_island = glob.m[glob.max_island[0], glob.max_island[1]]
 
 	#for b in beetles:
 	#	b.state['act'] = 'idle'
@@ -296,21 +309,28 @@ def loop(load_state):
 				self.state['act'] = 'idle'
 			except Exception as e:
 				print(e)
+		elif glob.m[b.x, b.y] is not None and glob.m[b.x, b.y].sticks >= d['Smin']:
+			try:
+				conn.ignition(b.n)
+			except:
+				pass
 		elif b.state['act'] == 'idle':
 			if b.my_field.t == 'LAND':
 				if b.role == 'NONE':
-					dist_w, sticks_w = 30, 1
+					dist_w, sticks_w = 10, 1
 				else:
-					dist_w, sticks_w = 1, 1
-				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w))
+					dist_w, sticks_w = 2, 1
+				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
 				b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
-				b.state['target'] = (b.x, b.y)
+				b.state['return_to'] = (b.x, b.y)
 				b.state['act'] = 'take_wood'
-			else:
+				b.step(conn)
+			else: #natychmiastowa ewakuacja na najblizsza wyspe
 				dist_w, sticks_w = 1, 0
-				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w))
+				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
 				b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
 				b.state['act'] = 'rescue'
+				b.step(conn)
 		elif b.state['act'] == 'take_wood':
 			if b.state['route'] == [0, 0]:
 				try:
@@ -318,12 +338,14 @@ def loop(load_state):
 				except Exception as e:
 					print(e)
 				b.state['act'] = 'go_back'
-				if b.role == 'CAPTAIN':
-					dist_w, sticks_w = 1, 0
-					b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w))
-					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
+				if b.role == 'CAPTAIN' and glob.max_island is not None:
+					b.state['route'] = [glob.max_island.x - b.x, glob.max_island.y - b.y]
 				else:
-					b.state['route'] = [b.state['target'][0] - b.x, b.state['target'][1] - b.y]
+					b.state['route'] = [b.state['return_to'][0] - b.x, b.state['return_to'][1] - b.y]
+				try:
+					b.step(conn)
+				except:
+					pass
 			else:
 				b.step(conn)
 		elif b.state['act'] == 'go_back':
@@ -333,7 +355,20 @@ def loop(load_state):
 				except Exception as e:
 					print(e)
 				b.state['act'] = 'idle'
+				try:
+					b.step(conn)
+				except:
+					pass
 			else:
+				if b.role == 'CAPTAIN':
+					need = 40
+				else:
+					need = 5
+				if b.sticks < need:
+					b.state['act'] = 'take_wood'
+					dist_w, sticks_w = 1, 1
+					b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
+					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
 				b.step(conn)
 		elif b.state['act'] == 'rescue':
 			if b.my_field.t == 'LAND': # saved!
@@ -343,6 +378,9 @@ def loop(load_state):
 
 
 	print_ar(beetles)
+
+	if glob.max_island is not None:
+		print("my sticks on max island (%i %i): %i / %i" % (glob.max_island.x, glob.max_island.y, glob.max_island.mysticks, glob.max_island.sticks))
 
 	lands, waters = glob.m.dump()
 	write_file('lands', lands)
