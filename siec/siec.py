@@ -8,6 +8,7 @@ import argparse
 import traceback
 import collections
 import heapq
+import sys
 
 class Config(object):
 	def __init__(self, universum=1):
@@ -143,19 +144,6 @@ def make_graph():
 	return [ [ adjacent(Point(i, j)) for j in xrange(L)] for i in xrange(L) ]
 
 
-def new_world(loadstate=False):
-	global L,N,D,fee,maxrequests
-	global cities
-	print info("new world")
-	
-	if loadstate:
-		L,N,D, fee, maxrequests = serializer.load()
-	else:
-		(L,N,D,C,W,T,K), fee, maxrequests = conn.describe_world()
-	
-	cities = [Point(i, j) for i,j in allij() if fee[i][j] == 0]
-	G = make_graph()
-		
 
 
 def owned():
@@ -165,11 +153,12 @@ def owned():
 
 
 
-def dumpfees(path="fees"):
+def dumpsplot(items, path):
 	with open(path, 'w') as f:
 		for i,j in allij():
-			if fee[i][j] < 100:
-				print>>f, i, j, maxrequests[i][j]
+				if items[i][i] == 10**9:
+					print Point(i,j)
+				print>>f, i, j, items[i][j]
 
 
 def dumppoints(items, path):
@@ -218,9 +207,21 @@ def dijkstra_route(results, city, dest):
 		dist_city = results[city.i][city.j]
 		for neigh in adjacent(city):
 			dist_neigh = results[neigh.i][neigh.j]
-			if dist_neigh +
+			if dist_neigh + fee[city.i][city.j] == dist_city:
+				yield neigh
+				city = neigh
+				break
+		# print "not found"
 
 
+def compute_dijkstras():
+	results = tdarr(lambda i,j: 0)
+	print "czekaj na dajkstrę..."
+	for a in cities:
+		results[a.i][a.j] = dijkstra_dists(a)
+		sys.stdout.write(".")
+		sys.stdout.flush()
+	return results
 
 
 def solve():
@@ -228,24 +229,23 @@ def solve():
 	fu = FindUnion()
 	# cities_dists = [(dfs_dist(a,b), a, b) for a in cities for b in cities]
 	cities_dists = []
-	dijkstra_results = tdarr(lambda i,j: 0)
-	print "czekaj na dajkstrę..."
 	for a in cities:
-		dists_a = dijkstra_dists(a)
+		dists_a = dijkstras[a.i][a.j]
 		for b in cities:
 			cities_dists.append((dists_a[b.i][b.j], a, b))
-		dijkstra_results[a.i][a.j] = dists_a
-
 	cities_dists.sort()
-	mcount = 0
+
+	# dumpsplot(dijkstra_results[cities[0].i][cities[0].j], "dists")
+	print cities[0]
+
+	print "\nczekaj na routy..."
 	for dist, a, b in cities_dists:
 		if not fu.same(a, b):
 			plan.extend(dfs_route(a, b))
+			# plan.extend(dijkstra_route(dijkstra_results[b.i][b.j], a, b))
 			fu.merge(a,b)
-			mcount += 1
 	plan.extend(cities)
 	plan = set(plan)
-	print mcount
 
 	dumppoints(cities, "cities")
 	dumppoints(plan, "plan")
@@ -256,6 +256,21 @@ def solve():
 def obtain_permission():
 	pass
 
+
+
+def new_world(loadstate=False):
+	global L,N,D,fee,maxrequests,dijkstras
+	global cities
+	print info("new world")
+	
+	if loadstate:
+		L,N,D, fee, maxrequests, dijkstras = serializer.load()
+	else:
+		(L,N,D,C,W,T,K), fee, maxrequests = conn.describe_world()
+	
+	cities = [Point(i, j) for i,j in allij() if fee[i][j] == 0]
+	if not loadstate:
+		dijkstras = compute_dijkstras()
 
 if __name__ == '__main__':
 	args = parse_args()
@@ -288,7 +303,7 @@ if __name__ == '__main__':
 					conn.wait()
 
 	except KeyboardInterrupt:
-		serializer.save((L,N,D, fee, maxrequests))
+		serializer.save((L,N,D, fee, maxrequests, dijkstras))
 	except:
 		traceback.print_exc()
-		serializer.save((L,N,D, fee, maxrequests), ".crash")
+		serializer.save((L,N,D, fee, maxrequests, dijkstras), ".crash")
