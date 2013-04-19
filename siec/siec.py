@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env pypy
 # -*- coding: utf-8 -*-
 import dl24.connection
 from dl24.misc import Serializer
@@ -118,41 +118,6 @@ def allij():
 		for j in xrange(L):
 			yield (i, j)
 
-def new_world(loadstate=False):
-	global L,N,D,fee,maxrequests
-	global cities
-	print info("new world")
-	
-	if loadstate:
-		L,N,D, fee, maxrequests = serializer.load()
-	else:
-		(L,N,D,C,W,T,K), fee, maxrequests = conn.describe_world()
-	
-	cities = [Point(i, j) for i,j in allij() if fee[i][j] == 0]
-
-		
-
-
-def owned():
-	points = list(cities)
-	points.extend(conn.my_requests())
-	return points
-
-
-
-def dumpfees(path="fees"):
-	with open(path, 'w') as f:
-		for i,j in allij():
-			if fee[i][j] < 100:
-				print>>f, i, j, maxrequests[i][j]
-
-
-def dumppoints(items, path):
-	with open(path, 'w') as f:
-		for point in items: 
-			print>>f, point.i, point.j
-
-
 
 def adjacent(point):
 	def isok(point):
@@ -178,6 +143,44 @@ def make_graph():
 	return [ [ adjacent(Point(i, j)) for j in xrange(L)] for i in xrange(L) ]
 
 
+def new_world(loadstate=False):
+	global L,N,D,fee,maxrequests
+	global cities
+	print info("new world")
+	
+	if loadstate:
+		L,N,D, fee, maxrequests = serializer.load()
+	else:
+		(L,N,D,C,W,T,K), fee, maxrequests = conn.describe_world()
+	
+	cities = [Point(i, j) for i,j in allij() if fee[i][j] == 0]
+	G = make_graph()
+		
+
+
+def owned():
+	points = list(cities)
+	points.extend(conn.my_requests())
+	return points
+
+
+
+def dumpfees(path="fees"):
+	with open(path, 'w') as f:
+		for i,j in allij():
+			if fee[i][j] < 100:
+				print>>f, i, j, maxrequests[i][j]
+
+
+def dumppoints(items, path):
+	with open(path, 'w') as f:
+		for point in items: 
+			print>>f, point.i, point.j
+
+
+
+
+
 def dfs_dist(pointa, pointb):
 	return abs(pointa.i - pointb.i) + abs(pointa.j - pointb.j)
 
@@ -193,14 +196,39 @@ def dfs_route(pointa, pointb):
 
 def dijkstra_dists(city):
 	done = set()
-	#reachable = 
+	results = tdarr(lambda i,j: 10**9)
+	heap = [(0, city)]
+	while heap:
+		dist, pt = heapq.heappop(heap)
+		if results[pt.i][pt.j] < dist: continue
+		done.add(pt)
+
+		for neigh in adjacent(pt):
+			if neigh in done: continue
+			nneighdist = dist + fee[neigh.i][neigh.j]
+			if nneighdist < results[neigh.i][neigh.j]:
+				results[neigh.i][neigh.j] = nneighdist
+				heapq.heappush(heap, (nneighdist, neigh))
+
+	return results
+
+
+def dijkstra_route(results, city, dest):
+	
 
 
 
 def solve():
 	plan = []
 	fu = FindUnion()
-	cities_dists = [(dfs_dist(a,b), a, b) for a in cities for b in cities]
+	# cities_dists = [(dfs_dist(a,b), a, b) for a in cities for b in cities]
+	cities_dists = []
+	for a in cities:
+		dists_a = dijkstra_dists(a)
+		for b in cities:
+			cities_dists.append((dists_a[b.i][b.j], a, b))
+		print a
+
 	cities_dists.sort()
 	mcount = 0
 	for dist, a, b in cities_dists:
@@ -209,12 +237,13 @@ def solve():
 			fu.merge(a,b)
 			mcount += 1
 	plan.extend(cities)
+	plan = set(plan)
 	print mcount
 
-	# dumppoints(cities, "cities")
-	# dumppoints(set(plan), "plan")
+	dumppoints(cities, "cities")
+	dumppoints(plan, "plan")
 
-	conn.declare_plan(set(plan))
+	conn.declare_plan(plan)
 
 
 def obtain_permission():
