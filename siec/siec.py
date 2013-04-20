@@ -78,6 +78,8 @@ def parse_args():
 		help="do not load initial state from dump file", dest='loadstate')
 	# parser.add_argument("-R", "--recompute", action='store_true', 
 	# 	help="recompute dijkstras")
+	parser.add_argument("-A", "--accurate", action='store_true',
+		help="compute accurate dijkstra")
 	return parser.parse_args()
 
 
@@ -162,6 +164,12 @@ def fee0(place):
 	return fee[place.i][place.j] * (1 if place in permissions else C)
 
 
+def feeA(place):
+	city_cost = 1
+	k = 100000
+	return k*fee0(place) or city_cost
+
+
 def current_score():
 	return sum(map(fee0, plan))
 
@@ -209,10 +217,11 @@ def dumppoints(items, path):
 
 
 def dijkstra_dists(city):
+	feeN = feeA if args.accurate else fee1
 	done = set()
 	results = tdarr(lambda i,j: 10**9)
 	results[city.i][city.j] = fee1(city)
-	heap = [(fee1(city), city)]
+	heap = [(feeN(city), city)]
 	while heap:
 		dist, pt = heapq.heappop(heap)
 		if results[pt.i][pt.j] < dist: continue
@@ -220,7 +229,7 @@ def dijkstra_dists(city):
 
 		for neigh in adjacent(pt):
 			if neigh in done: continue
-			nneighdist = dist + fee1(neigh)
+			nneighdist = dist + feeN(neigh)
 			if nneighdist < results[neigh.i][neigh.j]:
 				results[neigh.i][neigh.j] = nneighdist
 				heapq.heappush(heap, (nneighdist, neigh))
@@ -229,12 +238,13 @@ def dijkstra_dists(city):
 
 
 def dijkstra_route(city, dest, dijkstras):
+	feeN = feeA if args.accurate else fee1
 	results = dijkstras[dest.i][dest.j]
 	while city != dest:
 		dist_city = results[city.i][city.j]
 		for neigh in adjacent(city):
 			dist_neigh = results[neigh.i][neigh.j]
-			if dist_neigh + fee1(city) == dist_city:
+			if dist_neigh + feeN(city) == dist_city:
 				yield neigh
 				city = neigh
 
@@ -245,7 +255,7 @@ def dot():
 
 def compute_dijkstras():
 	results = tdarr(lambda i,j: 0)
-	print "czekaj na dajkstrę"
+	print "czekaj na dajkstrę", args.accurate
 	with delay_sigint():
 		pool = multiprocessing.Pool(3)
 		dix = pool.map(dijkstra_dists, cities)
@@ -259,15 +269,20 @@ def compute_dijkstras():
 
 
 
-point_comp = lambda point: (-maxrequests[point.i][point.j], fee0(point))
+point_comp = lambda point: (-min(maxrequests[point.i][point.j],3), fee0(point))
 def sort_used_points():
 	used_points.sort(key=point_comp)
 
 def update_permissions():
 	new_reservations = conn.last_obtained()[0]
 	with delay_sigint():
-		for rvt in new_reservations:
-			maxrequests[rvt.i][rvt.j] -= 1
+		for i,j in new_reservations:
+			maxrequests[i][j] -= 1
+			if maxrequests[i][j] <= 0:
+				maxrequests[i][j] = 10000
+				point = Point(i,j)
+				if point not in permissions:
+					saturated.add(Point(i, j))
 	sort_used_points()
 
 def solve():
@@ -312,7 +327,7 @@ def solve():
 def obtain_permission():
 	while used_points:
 		point = used_points.pop()
-		if point in permissions:
+		if point in permissions or point in saturated:
 			continue
 		try:
 			print "trying", point, point_comp(point)
@@ -325,6 +340,8 @@ def obtain_permission():
 		else:
 			print good("obtained permission for %s worth %d" % (str(point), fee0(point)))
 			permissions.add(point)
+			# if maxrequests[point.i][point.j] >= 20: # odpal dijkstrę
+			# 	return False
 			return True
 	print "no more used_points:", len(used_points)
 	return False
@@ -332,7 +349,7 @@ def obtain_permission():
 
 
 
-def new_world(loadstate=False):
+def new_world(loadstate=False, leave_accurate=False):
 	global L,N,D,C,fee,maxrequests,saturated # pickled
 	global cities, permissions # computed
 	print info("new world")
@@ -352,6 +369,9 @@ def new_world(loadstate=False):
 	permissions = set(cities)
 	for point in conn.my_requests():
 		permissions.add(point)
+
+	if not leave_accurate:
+		args.accurate = False
 		
 	# if not loadstate or args.recompute:
 	# 	dijkstras = compute_dijkstras()
@@ -367,7 +387,7 @@ def print_high_scores():
 			print scstr,
 		else:
 			print rank,
-	print "" if score in ranks else scstr
+	print "" if score in ranks else "... " + scstr
 
 
 # def ddist(a, b):
@@ -380,7 +400,7 @@ if __name__ == '__main__':
 	conn = Connection(config.host, config.port)
 	print info("connected.")
 
-	new_world(args.loadstate)
+	new_world(args.loadstate, leave_accurate=True)
 
 
 	time_left = conn.time_to_request()
@@ -395,26 +415,27 @@ if __name__ == '__main__':
 			print "score:", score
 
 			while 1:
-				# sprawdź licznik rund
-				old_time_left = time_left
-				time_left = conn.time_to_request()
-				print "to end:", time_left
-				if time_left > old_time_left:
-					# nowa runda!
-					new_world()
-					break
-				
-				
-				#if score < last_score:
+				# dokonuj rezerwacji
 				if used_points or was_prog:
 					was_prog = obtain_permission()
 					if not was_prog:
 						break
 				print_high_scores()
+
+				# sprawdź licznik rund
+				old_time_left = time_left
+				time_left = conn.time_to_request()
+				print "to end:", time_left
+				if time_left > old_time_left: # nowa runda!
+					new_world()
+					break
+				if time_left < 20 and not args.accurate: # mało czasu, licz dokładny wynik!
+					args.accurate = True
+					break
+								
 				print "used points left: %d" % len(used_points)
 				dumpfees(plan, args.universum)
-				#else:
-				#	print good("optimum?")
+
 				update_permissions()
 				conn.wait()
 
