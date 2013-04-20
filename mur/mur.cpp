@@ -194,6 +194,12 @@ int main() {
 		}
 	}
 	
+	for (uns y = 1; y <= Y; ++y) {
+		for (uns x = 1; x <= X; ++x) {
+			znane(above(y,x), y, x) = 1;
+		}
+	}
+	
 	uns D = in;
 	uns nshapes = in;
 	vector<Klocek> shapes;
@@ -255,7 +261,7 @@ int main() {
 										uns nx = x + xx + dx;
 										uns ny = y + yy + dy;
 										uns nz = h0 + zz + dz;
-										taczes += znane(nz, ny, nx) || uns(above(ny, nx)) == nz;
+										taczes += znane(nz, ny, nx);
 									}
 								}
 							}
