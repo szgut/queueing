@@ -373,11 +373,12 @@ def loop():
 		gs.prabove.fill(0)
 		gs.wszystko = np.empty((gs.world.Z + 1, gs.world.Y, gs.world.X), dtype=np.uint8)
 		gs.wszystko.fill(0)
-		for y in xrange(gs.world.Y):
-			for x in xrange(gs.world.X):
-				for z in xrange(gs.prabove[y,x] + 1, gs.above[y,x]):
-					gs.wszystko[z,y,x] |= 1
-				gs.wszystko[gs.above[y,x], y, x] = 2
+	
+	for y in xrange(gs.world.Y):
+		for x in xrange(gs.world.X):
+			for z in xrange(gs.prabove[y,x] + 1, gs.above[y,x]):
+				gs.wszystko[z,y,x] |= 1
+			gs.wszystko[gs.above[y,x], y, x] = 2
 	
 	print info('szukam')
 	lista = cepepe()
