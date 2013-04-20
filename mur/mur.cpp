@@ -232,7 +232,7 @@ int main() {
 						tuple<int,int,int>{0,-1,0},
 						tuple<int,int,int>{0,0,-1}
 					};
-					const vector<float> MAYBE = {0.6, 0.4, 0.2, 0.1};
+					const vector<float> MAYBE = {1.f/D, 0.5f/D, 0.25f/D, 0.125f/D};
 					float taczes = 0;
 					for (int zz = 0; zz < int(D); ++zz) {
 						for (int yy = 0; yy < int(D); ++yy) {
