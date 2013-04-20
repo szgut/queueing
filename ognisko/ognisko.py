@@ -189,6 +189,7 @@ class Connection(dl24.connection.Connection):
 		for i in range(0, 5):
 			isl = self.readints(3)
 			a['islands'].append(isl)
+		a['islands'] = sorted(a['islands'], key = lambda i: -i[2])
 		return a
 
 	def ls(self):
@@ -341,11 +342,11 @@ def loop(load_state):
 				if (b.role == 'CAPTAIN' and
 						(b.x, b.y) == (max_island.x, max_island.y) and
 						randint(0, 2) == 0):
-					b.state['give_stolen_first'] = True # this will make it give what it took here, to later take it back
 					try:
 						conn.take(b.n)
+						b.state['give_stolen_first'] = True # this will make it give what it took here, to later take it back
 					except:
-						pass
+						continue
 					dist_w, sticks_w = 1, 0
 					b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
 					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
@@ -354,7 +355,7 @@ def loop(load_state):
 				if b.role == 'NONE':
 					dist_w, sticks_w = 25, 1
 				else:
-					dist_w, sticks_w = 2, 1
+					dist_w, sticks_w = 5, 1
 				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
 				b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
 				b.state['return_to'] = (b.x, b.y)
@@ -397,18 +398,14 @@ def loop(load_state):
 				except Exception as e:
 					print(e)
 				b.state['act'] = 'idle'
-				try:
-					b.step(conn)
-				except:
-					pass
 			else:
 				if b.role == 'CAPTAIN':
-					need = 40
+					need = 20
 				else:
-					need = 5
+					need = 4
 				if b.sticks < need:
 					b.state['act'] = 'take_wood'
-					dist_w, sticks_w = 1, 1
+					dist_w, sticks_w = 20, 1
 					b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
 					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
 				b.step(conn)
@@ -422,7 +419,12 @@ def loop(load_state):
 	print_ar(beetles)
 
 	if max_island is not None:
-		print("my sticks on max island (%i %i): %i / %i" % (max_island.x, max_island.y, max_island.mysticks, max_island.sticks))
+		print("my sticks on target island (%i %i):\t%i / %i" % (max_island.x, max_island.y, max_island.mysticks, max_island.sticks))
+	mx, my = t['islands'][0][0], t['islands'][0][1]
+	msticks = t['islands'][0][2]
+	if glob.m[mx, my] is not None:
+		glob_max = glob.m[mx, my]
+		print("my sticks on max island (%i %i):\t%i / %i" % (glob_max.x, glob_max.y, glob_max.mysticks, msticks))
 
 	lands, waters = glob.m.dump()
 	write_file('lands', lands)
