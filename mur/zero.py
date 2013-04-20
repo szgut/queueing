@@ -11,6 +11,10 @@ import traceback
 import numpy as np
 from datetime import datetime
 from threading import Thread
+from popen2 import popen2
+from dl24.scanf import readint as ridi
+from dl24.scanf import readfloat as rifle
+from time import sleep
 
 class RejectedBrick(Exception): pass
 class RejectedMatch(RejectedBrick): pass
@@ -112,13 +116,20 @@ class Connection(dl24.connection.Connection):
 		return w
 	
 	def drop(self, x):
+		
 		(raz, dwa, x, y) = x
-		x = (raz, dwa, x+1, y+1)
-		self.cmd_drop_brick(x)
+		zzz = (raz, dwa, x+1, y+1)
+		print "drop", zzz, "/", (gs.world.X, gs.world.Y, gs.world.Z)
+		print self.above()[y-1:y+3, x-1:x+3]
+		
+		self.cmd_drop_brick(zzz)
 		blah = self._readstr_assert(['ACCEPTED', 'REJECTED_HEIGHT', 'REJECTED_MATCH'])
-		if blah == 'ACCEPTED': return self.readfloat()
+		if blah == 'ACCEPTED': ret = self.readfloat()
 		elif blah == 'REJECTED_HEIGHT': raise RejectedHeight
 		else: raise RejectedMatch
+		
+		print self.above()[y-1:y+3, x-1:x+3]
+		return ret
 	
 	def bricks(self):
 		self.cmd_list_bricks()
@@ -130,10 +141,10 @@ class Connection(dl24.connection.Connection):
 		pmin = self.readint()
 		def _getslice():
 			li = [ self.readline() for x in range(gs.world.D) ]
-			li.reverse()
+			li.reverse() # odwracamy y
 			return li
 		li = [ _getslice() for x in range(gs.world.D) ]
-		li.reverse()
+		# zty sa ok!
 		return Brick(w, pmin, li)
 	
 	def above(self):
@@ -226,6 +237,55 @@ def init_state(read):
 		gs = State()
 
 
+def cepepe():
+	opu, ipu = popen2("./mur");
+	print>>ipu, gs.world.Cv, gs.world.Cp
+	print>>ipu, gs.world.X, gs.world.Y, gs.world.Z
+	
+	for _ in xrange(gs.world.X + 2): print>>ipu, 0,
+	print>>ipu
+	
+	for r in xrange(gs.world.Y):	
+		print>>ipu, 0,
+		for c in xrange(gs.world.X): print>>ipu, gs.above[r,c],
+		print>>ipu, 0,
+		print>>ipu
+		
+	for _ in xrange(gs.world.X + 2): print>>ipu, 0,
+	print>>ipu
+	
+	print>>ipu, gs.world.D
+	
+	print>>ipu, gs.world.B
+	for bid in gs.abids:
+		brick = gs.bricks[bid]
+		print>>ipu, bid, brick.w, brick.pmin
+		for layer in brick.d:
+			for row in layer:
+				for x in row:
+					print>>ipu, (1 if x == '#' else 0),
+				print>>ipu
+		print>>ipu
+	
+	for arr in ROTS_ARRS:
+		for r in xrange(4):
+			for c in xrange(4):
+				print>>ipu, arr[r,c],
+			print>>ipu
+		print>>ipu
+	
+	ipu.close()
+	li = []
+	for _ in xrange(ridi(opu)):
+		scor = -rifle(opu)
+		bid = ridi(opu)
+		rid = ridi(opu)
+		x = ridi(opu)
+		y = ridi(opu)
+		li.append((scor, (bid, ROTS[rid], x, y)))
+	return li
+
+
 class Napykalacz(Thread):
 	def run(self):
 		while napykalam:
@@ -240,9 +300,6 @@ class Napykalacz(Thread):
 				pass
 
 zmienna_statyczna = [1]
-napykalam = False
-lid = 0
-lista = []
 def loop():	
 	with delay_sigint():
 		print info('world')
@@ -256,18 +313,15 @@ def loop():
 				print info('brak mi ' + str(x))
 				gs.bricks[x] = conn.brick(x)
 	
+	sleep(0.6)
+	
 	print info('spogladam z gory')
 	gs.above = conn.above()
 	
-	global napykalam
-	global lista
-	if napykalam == False:
-		napykalam = True
-		Napykalacz().start()
-	olid = lid
-	zuzylem = 0
+	print info('szukam')
+	lista = cepepe()
+	
 	for z in lista[:gs.world.R]:
-		zuzylem += 1
 		try:
 			print info('probuje zrzucic ' + str(z))
 			print good(str(conn.drop(z[1])) + ' pkt')
@@ -276,8 +330,6 @@ def loop():
 			pass
 		except:
 			pass
-	if olid == lid:
-		lista = lista[zuzylem:]
 
 
 if __name__ == '__main__':
