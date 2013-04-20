@@ -247,7 +247,9 @@ def compute_dijkstras():
 	results = tdarr(lambda i,j: 0)
 	print "czekaj na dajkstrę"
 	with delay_sigint():
-		dix = multiprocessing.Pool(3).map(dijkstra_dists, cities)
+		pool = multiprocessing.Pool(3)
+		dix = pool.map(dijkstra_dists, cities)
+		pool.close()
 	for a, dij in zip(cities, dix):
 		results[a.i][a.j] = dij
 	print
@@ -257,7 +259,7 @@ def compute_dijkstras():
 
 
 
-
+point_comp = lambda point: (-maxrequests[point.i][point.j], fee0(point))
 
 def solve():
 	global plan, used_points
@@ -293,7 +295,8 @@ def solve():
 
 	conn.declare_plan(plan)
 
-	used_points = sorted([point for point in plan if point not in saturated and point not in permissions], key=fee0)
+	
+	used_points = sorted([point for point in plan if point not in saturated and point not in permissions], key=point_comp)
 
 
 def obtain_permission():
@@ -302,7 +305,7 @@ def obtain_permission():
 		if point in permissions:
 			continue
 		try:
-			print "trying", point
+			print "trying", point, point_comp(point)
 			conn.request(point)
 		except dl24.connection.CommandFailedError as exc:
 			if exc.errno == 107:
