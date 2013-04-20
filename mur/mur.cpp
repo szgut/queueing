@@ -243,6 +243,7 @@ int main() {
 						tuple<int,int,int>{0,-1,0},
 						tuple<int,int,int>{0,0,-1}
 					};
+					if (h0 + D >= Z) continue;
 					int taczes = 0;
 					for (int zz = 0; zz < int(D); ++zz) {
 						for (int yy = 0; yy < int(D); ++yy) {
@@ -260,7 +261,7 @@ int main() {
 							}
 						}
 					}
-					if (taczes >= k.pmin && h0 + D < Z) {
+					if (taczes >= k.pmin) {
 						float score = k.weight * (Cv * box.volume() + Cp * taczes);
 						elems.emplace_back(-score, k.id, rid, x, y, taczes, h0);
 					}
