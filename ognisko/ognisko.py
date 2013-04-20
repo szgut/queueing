@@ -3,7 +3,7 @@
 import dl24.connection
 from dl24.misc import Serializer
 from dl24.misc import delay_sigint
-from dl24.colors import warn, bad, good, info, color, GREEN
+from dl24.colors import warn, bad, good, info, color, GREEN, MAGENTA
 import argparse
 import traceback
 
@@ -43,7 +43,7 @@ class Beetle(object):
 
 	def __repr__(self):
 		if self.state.has_key('give_stolen_first'):
-			stealing = "!stealing!"
+			stealing = color(MAGENTA, "!stealing!")
 		else:
 			stealing = ""
 		l1 = ("B%i(%i, %i)\t%s st:%i busy:%i rt:%s act:%s %s" %
