@@ -76,8 +76,8 @@ def parse_args():
 		help="universum number", default=1)
 	parser.add_argument("-D", "--dontload", action='store_false', 
 		help="do not load initial state from dump file", dest='loadstate')
-	# parser.add_argument("-R", "--recompute", action='store_true', 
-	# 	help="recompute dijkstras")
+	# parser.add_argument("--double", action='store_true', 
+	# 	help="double solve()")
 	parser.add_argument("-A", "--accurate", action='store_true',
 		help="compute accurate dijkstra")
 	return parser.parse_args()
@@ -227,6 +227,7 @@ def dijkstra_dists(city):
 def dijkstra_route(city, dest, dijkstras):
 	feeN = feeA if args.accurate else fee1
 	results = dijkstras[dest.i][dest.j]
+	# yield city
 	while city != dest:
 		dist_city = results[city.i][city.j]
 		for neigh in adjacent(city):
@@ -282,7 +283,7 @@ def update_permissions():
 					saturated.add(Point(i, j))
 	sort_used_points()
 
-def solve():
+def solve(): #										<==========================================================
 	global plan, used_points, fu
 	fu = FindUnion()
 	dijkstras = compute_dijkstras()
@@ -292,18 +293,24 @@ def solve():
 	for a in cities:
 		dists_a = dijkstras[a.i][a.j]
 		for b in cities:
-			cities_dists.append((dists_a[b.i][b.j], a, b))
-	cities_dists.sort()
+			#cities_dists.append((dists_a[b.i][b.j], a, b))
+			heapq.heappush(cities_dists, (dists_a[b.i][b.j], a, b))
+	#cities_dists.sort()
 
 	# dumpsplot(dijkstra_results[cities[0].i][cities[0].j], "dists")
 
+
 	print "czekaj na routy"
 	plan = []
-	for dist, a, b in cities_dists:
+	while cities_dists:
+		dist, a, b = heapq.heappop(cities_dists)
+	#for dist, a, b in cities_dists:
 		if not fu.same(a, b):
 			route = list(dijkstra_route(a, b, dijkstras))
 			for r in route:
 				fu.merge(a,r)
+				for c in cities:
+					heapq.heappush(cities_dists, (dijkstras[c.i][c.j][r.i][r.j], r, c))
 			plan.extend(route)
 			#plan.extend(dijkstra_route(a, b, dijkstras))
 			dot()
@@ -372,7 +379,6 @@ def new_world(loadstate=False, leave_accurate=False):
 
 	if not leave_accurate:
 		args.accurate = False
-		
 	# if not loadstate or args.recompute:
 	# 	dijkstras = compute_dijkstras()
 
@@ -406,6 +412,7 @@ if __name__ == '__main__':
 	time_left = conn.time_to_request()
 	score = 10**9
 	was_prog = False
+
 	try:
 		while 1:
 			# new world, compute spanning tree
@@ -429,9 +436,9 @@ if __name__ == '__main__':
 				if time_left > old_time_left: # nowa runda!
 					new_world()
 					break
-				if time_left < 20 and not args.accurate: # mało czasu, licz dokładny wynik!
-					args.accurate = True
-					break
+				# if time_left < 20 and not args.accurate: # mało czasu, licz dokładny wynik!
+				# 	args.accurate = True
+				# 	break
 								
 				print "used points left: %d" % len(used_points)
 				dumpfees(plan, args.universum)
