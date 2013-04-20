@@ -264,7 +264,10 @@ def sort_used_points():
 	used_points.sort(key=point_comp)
 
 def update_permissions():
-	
+	new_reservations = conn.last_obtained()[0]
+	with delay_sigint():
+		for rvt in new_reservations:
+			maxrequests[rvt.i][rvt.j] -= 1
 	sort_used_points()
 
 def solve():
@@ -412,6 +415,7 @@ if __name__ == '__main__':
 				dumpfees(plan, args.universum)
 				#else:
 				#	print good("optimum?")
+				update_permissions()
 				conn.wait()
 
 	except KeyboardInterrupt:
