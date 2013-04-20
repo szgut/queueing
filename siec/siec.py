@@ -3,12 +3,13 @@
 import dl24.connection
 from dl24.misc import Serializer
 from dl24.misc import delay_sigint
-from dl24.colors import warn, bad, good, info
+from dl24.colors import warn, bad, good, info, color, MAGENTA
 import argparse
 import traceback
 import collections
 import heapq
 import sys
+import multiprocessing
 
 class Config(object):
 	def __init__(self, universum=1):
@@ -75,8 +76,8 @@ def parse_args():
 		help="universum number", default=1)
 	parser.add_argument("-D", "--dontload", action='store_false', 
 		help="do not load initial state from dump file", dest='loadstate')
-	parser.add_argument("-R", "--recompute", action='store_true', 
-		help="recompute dijkstras")
+	# parser.add_argument("-R", "--recompute", action='store_true', 
+	# 	help="recompute dijkstras")
 	return parser.parse_args()
 
 
@@ -142,20 +143,28 @@ def adjacent(point):
 			yield Point(point.i+1, point.j)
 	return filter(isok, sasiedzi(point))
 
-def make_graph():
-	return [ [ adjacent(Point(i, j)) for j in xrange(L)] for i in xrange(L) ]
+# def make_graph():
+# 	return [ [ adjacent(Point(i, j)) for j in xrange(L)] for i in xrange(L) ]
 
 
 
 
 
 
-def fee1(city):
-	if city in permissions:
-		return 1
-	if city in saturated:
-		return (fee[city.i][city.j] or 1) * 10
-	return fee[city.i][city.j] or 1
+def fee1(place):
+	city_cost = 1
+	k = 100000
+	if place in saturated:
+		return C*k*fee[place.i][place.j] or city_cost
+	return k*fee[place.i][place.j] or city_cost
+
+def fee0(place):
+	return fee[place.i][place.j] * (1 if place in permissions else C)
+
+
+def current_score():
+	return sum(map(fee0, plan))
+
 
 
 def dumpsplot(items, path):
@@ -163,10 +172,17 @@ def dumpsplot(items, path):
 		for i,j in allij():
 				print>>f, i, j, items[i][j]
 
-def dumpfees(plan, path):
-	with open(path, 'w') as f:
-		for place in plan:
-			print>>f, place.i, place.j, fee1(place)
+def dumpfees(plan, uni):
+	with open("fees%d"%uni, 'w') as fs:
+		with open("satu%d"%uni, 'w') as st:
+			with open("cit%d"%uni, 'w') as ct:
+				for place in plan:
+					if place in cities:
+						print>>ct, place.i, place.j, fee0(place)
+					elif place not in saturated:
+						print>>fs, place.i, place.j, fee0(place)
+					else:
+						print>>st, place.i, place.j, fee0(place)
 
 
 
@@ -179,17 +195,17 @@ def dumppoints(items, path):
 
 
 
-def dfs_dist(pointa, pointb):
-	return abs(pointa.i - pointb.i) + abs(pointa.j - pointb.j)
+# def dfs_dist(pointa, pointb):
+# 	return abs(pointa.i - pointb.i) + abs(pointa.j - pointb.j)
 
-def dfs_route(pointa, pointb):
-	''' returns points between pointa and pointb (excluding) '''
-	dj = 1 if pointb.j > pointa.j else -1
-	di = 1 if pointb.i > pointa.i else -1
-	for j in xrange(pointa.j+dj, pointb.j+dj, dj):
-		yield Point(pointa.i, j)
-	for i in xrange(pointa.i+di, pointb.i, di):
-		yield Point(i, pointb.j)
+# def dfs_route(pointa, pointb):
+# 	''' returns points between pointa and pointb (excluding) '''
+# 	dj = 1 if pointb.j > pointa.j else -1
+# 	di = 1 if pointb.i > pointa.i else -1
+# 	for j in xrange(pointa.j+dj, pointb.j+dj, dj):
+# 		yield Point(pointa.i, j)
+# 	for i in xrange(pointa.i+di, pointb.i, di):
+# 		yield Point(i, pointb.j)
 
 
 def dijkstra_dists(city):
@@ -208,11 +224,11 @@ def dijkstra_dists(city):
 			if nneighdist < results[neigh.i][neigh.j]:
 				results[neigh.i][neigh.j] = nneighdist
 				heapq.heappush(heap, (nneighdist, neigh))
-
+	dot()
 	return results
 
 
-def dijkstra_route(city, dest):
+def dijkstra_route(city, dest, dijkstras):
 	results = dijkstras[dest.i][dest.j]
 	while city != dest:
 		dist_city = results[city.i][city.j]
@@ -230,16 +246,23 @@ def dot():
 def compute_dijkstras():
 	results = tdarr(lambda i,j: 0)
 	print "czekaj na dajkstrę"
-	for a in cities:
-		results[a.i][a.j] = dijkstra_dists(a)
-		dot()
+	with delay_sigint():
+		dix = multiprocessing.Pool(3).map(dijkstra_dists, cities)
+	for a, dij in zip(cities, dix):
+		results[a.i][a.j] = dij
 	print
 	return results
 
 
+
+
+
+
+
 def solve():
-	global used_points, plan
+	global plan, used_points
 	fu = FindUnion()
+	dijkstras = compute_dijkstras()
 	
 	# licz odległości między wszystkimi parami miast
 	cities_dists = []
@@ -256,7 +279,7 @@ def solve():
 	for dist, a, b in cities_dists:
 		if not fu.same(a, b):
 			#plan.extend(dfs_route(a, b))
-			plan.extend(dijkstra_route(a, b))
+			plan.extend(dijkstra_route(a, b, dijkstras))
 			dot()
 			# plan.extend(dijkstra_route(dijkstra_results[b.i][b.j], a, b))
 			fu.merge(a,b)
@@ -270,7 +293,7 @@ def solve():
 
 	conn.declare_plan(plan)
 
-	used_points = sorted(plan, key=fee1)
+	used_points = sorted([point for point in plan if point not in saturated and point not in permissions], key=fee0)
 
 
 def obtain_permission():
@@ -284,38 +307,54 @@ def obtain_permission():
 		except dl24.connection.CommandFailedError as exc:
 			if exc.errno == 107:
 				print "adding %s to saturated" % str(point)
-				saturated.add(point)
+				with delay_sigint():
+					saturated.add(point)
 		else:
-			print good("obtained permission for %s worth %d" % (str(point), fee1(point)))
+			print good("obtained permission for %s worth %d" % (str(point), fee0(point)))
 			permissions.add(point)
-			return
-	print "no more used_points"
+			return True
+	print "no more used_points:", len(used_points)
+	return False
 
 
 
 
-def new_world(loadstate=False, recompute=False):
-	global L,N,D,fee,maxrequests,dijkstras,saturated
-	global cities, permissions
+def new_world(loadstate=False):
+	global L,N,D,C,fee,maxrequests,saturated # pickled
+	global cities, permissions # computed
 	print info("new world")
 	
 	if loadstate:
-		L,N,D, fee, maxrequests, dijkstras, saturated = serializer.load()
+		with delay_sigint():
+			L,N,D,C, fee, maxrequests, saturated = serializer.load()
 	else:
-		(L,N,D,C,W,T,K), fee, maxrequests = conn.describe_world()
+		world_description = conn.describe_world()
+		with delay_sigint():
+			(L,N,D,C,W,T,K), fee, maxrequests = world_description
 		saturated = set()
 	
-	print "params:", L, N, D
+	print "params:", L, N, D, C
 	cities = [Point(i, j) for i,j in allij() if fee[i][j] == 0]
 	
 	permissions = set(cities)
 	for point in conn.my_requests():
 		permissions.add(point)
 		
-	if not loadstate or args.recompute:
-		dijkstras = compute_dijkstras()
+	# if not loadstate or args.recompute:
+	# 	dijkstras = compute_dijkstras()
 
-		
+
+def print_high_scores():
+	score = current_score()
+	scstr = color(MAGENTA, str(score))
+	ranks = conn.get_ranking()[:10]
+	print "scores:",
+	for rank in ranks:
+		if rank==score:
+			print scstr,
+		else:
+			print rank,
+	print "" if score in ranks else scstr
 
 
 # def ddist(a, b):
@@ -328,31 +367,45 @@ if __name__ == '__main__':
 	conn = Connection(config.host, config.port)
 	print info("connected.")
 
-	new_world(args.loadstate, args.recompute)
+	new_world(args.loadstate)
 
 
 	time_left = conn.time_to_request()
+	score = 10**9
+	was_prog = False
 	try:
 		while 1:
 			# new world, compute spanning tree
 			solve()
+			old_score = score
+			score = current_score()
+			print "score:", score
 
 			while 1:
-				obtain_permission()
-				print "used points left: %d" % len(used_points)
-				
+				# sprawdź licznik rund
 				old_time_left = time_left
 				time_left = conn.time_to_request()
+				print "to end:", time_left
 				if time_left > old_time_left:
+					# nowa runda!
 					new_world()
 					break
-				else:
-					print "to end:", time_left
-					dumpfees(plan, "fees%d" % args.universum)
-					conn.wait()
+				
+				
+				#if score < last_score:
+				if used_points or was_prog:
+					was_prog = obtain_permission()
+					if not was_prog:
+						break
+				print_high_scores()
+				print "used points left: %d" % len(used_points)
+				dumpfees(plan, args.universum)
+				#else:
+				#	print good("optimum?")
+				conn.wait()
 
 	except KeyboardInterrupt:
-		serializer.save((L,N,D, fee, maxrequests, dijkstras, saturated))
+		serializer.save((L,N,D,C, fee, maxrequests, saturated))
 	except:
 		traceback.print_exc()
-		serializer.save((L,N,D, fee, maxrequests, dijkstras, saturated), ".crash")
+		serializer.save((L,N,D,C, fee, maxrequests, saturated), ".crash")
