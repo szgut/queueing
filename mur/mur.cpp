@@ -152,6 +152,20 @@ struct Box {
 		for (auto const& x : b.v) os << x << endl;
 		return os;
 	}
+	
+	Box rot(Matrix const& rotator) {
+		Box box(de, de, de, 0);
+		for (uns z = 0; z < de; ++z)
+			for (uns y = 0; y < de; ++y)
+				for (uns x = 0; x < de; ++x) {
+					// ~cerr << endl << endl << rots[rid] << endl;
+					// ~cerr << x << " " << y << " " << z << endl;
+					vector<int> ret = rotator * vector<int>{{2*int(x),2*int(y),2*int(z),1}};
+					// ~cerr << ret[0] << " " << ret[1] << " " << ret[0] << endl;
+					box(ret[2]>>1, ret[1]>>1, ret[0]>>1) = (*this)(z,y,x);
+				}
+		return box;
+	}
 };
 
 struct Klocek {
@@ -192,18 +206,7 @@ int main() {
 	for (Klocek & k : shapes) {
 		set<Box> skm;
 		for (uns rid = 0; rid < 24; ++rid) {
-			Box box(D, D, D, 0);
-			for (uns z = 0; z < D; ++z)
-				for (uns y = 0; y < D; ++y)
-					for (uns x = 0; x < D; ++x) {
-						// ~cerr << endl << endl << rots[rid] << endl;
-						// ~cerr << x << " " << y << " " << z << endl;
-						vector<int> ret = rots[rid] * vector<int>{{2*int(x),2*int(y),2*int(z),1}};
-						// ~cerr << ret[0] << " " << ret[1] << " " << ret[0] << endl;
-						box(ret[2]>>1, ret[1]>>1, ret[0]>>1) = k.b(z,y,x);
-					}
-			
-			// ~cerr << endl << endl << k.b << box;
+			Box box = k.b.rot(rots[rid]);
 			if (skm.insert(box).second == false) continue;
 			
 			Matrix himap(D, D, 0);
@@ -264,6 +267,7 @@ int main() {
 		}
 	}
 	
+	cerr << "sorcę" << endl;
 	sort(elems.begin(), elems.end());
 	if (elems.size() > 666) elems.resize(666);
 	cerr << "wypisuję" << endl;
@@ -276,7 +280,7 @@ int main() {
 		
 		if (piec) {
 			piec--;
-			cerr << m[id] << endl;
+			cerr << m[id] << " " << m[id].rot(rots[rid]) << endl;
 			cerr << x << " " << y << "    taczes " << taczes << "     h0 " << h0 << endl;
 			cerr << above.slice(y-1, x-1, 4) << endl;
 		}
