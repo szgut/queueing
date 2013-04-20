@@ -377,7 +377,7 @@ def loop():
 		print good('nowy swiat!')
 		gs.prabove = np.empty(gs.above.shape, dtype=int)
 		gs.prabove.fill(0)
-		gs.wszystko = np.empty((gs.world.Z + 1, gs.world.Y, gs.world.X), dtype=np.uint8)
+		gs.wszystko = np.empty((gs.world.Z + 2, gs.world.Y, gs.world.X), dtype=np.uint8)
 		gs.wszystko.fill(0)
 	
 	for y in xrange(gs.world.Y):
