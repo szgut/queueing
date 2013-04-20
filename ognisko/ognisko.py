@@ -7,6 +7,8 @@ from dl24.colors import warn, bad, good, info
 import argparse
 import traceback
 
+from random import randint
+
 def flatten(l):
 	return sum(l, [])
 
@@ -46,7 +48,7 @@ class Beetle(object):
 		else:
 			l1 = ("B%i(%i, %i) on island with %i sticks (%i not mine)" %
 				(self.n, self.x, self.y, glob.m[self.x, self.y].sticks, glob.m[self.x, self.y].sticks - glob.m[self.x, self.y].mysticks))
-		l2 = repr(self.state)
+		l2 = '\t' + repr(self.state)
 		return '\n'.join([l1, l2])
 
 	def f(self):
@@ -147,17 +149,20 @@ class Field(object):
 
 
 	@staticmethod
-	def dist_key(f, x, y, dist_w, sticks_w):
+	def dist_key(f, x, y, dist_w, sticks_w, cutoff):
 		dist = abs(f.x - x) + abs(f.y - y)
 		dist_n = (2*glob.m.dim - float(dist)) / (2*glob.m.dim)
-		sticks_n = (min(40, float(f.sticks) - f.mysticks)) / 40
+		if cutoff:
+			sticks_n = (min(40, float(f.sticks) - f.mysticks)) / 40
+		else:
+			sticks_n = (float(f.sticks) - f.mysticks) / glob.max_sticks
 		if f.sticks - f.mysticks == 0:
 			return 0
 		return dist_w*dist_n + sticks_w*sticks_n
 
 	@staticmethod
-	def dist_from(x, y, dist_w, sticks_w):
-		return lambda f: Field.dist_key(f, x, y, dist_w, sticks_w)
+	def dist_from(x, y, dist_w, sticks_w, cutoff):
+		return lambda f: Field.dist_key(f, x, y, dist_w, sticks_w, cutoff)
 
 
 class Connection(dl24.connection.Connection):
@@ -236,6 +241,9 @@ class Connection(dl24.connection.Connection):
 	def build(self, n):
 		self.cmd_build(n)
 
+	def ignition(self, n):
+		self.cmd_ignition(n)
+
 def write_file(f, t):
 	f = open('.'.join([str(universum), f]), "w")
 	f.write(t)
@@ -281,6 +289,32 @@ def loop(load_state):
 
 	glob.max_sticks = max(map(lambda i: i[2], t['islands']))
 
+	max_island_ = max(t['islands'], key = lambda i: i[2])
+	if glob.m[max_island_[0], max_island_[1]] is None:
+		fbest = Field(max_island_[0], max_island_[1])
+		fbest.t = 'LAND'
+		fbest.sticks = max_island_[2]
+		fbest.mysticks = 0
+		glob.m.update([fbest])
+	max_island = glob.m[max_island_[0], max_island_[1]]
+
+	read_target = False
+	f = open(str(universum) + ".target", "r")
+	try:
+		x, y = f.readlines()[0].split(' ')
+		x = int(x)
+		y = int(y)
+		max_island = glob.m[x, y]
+		read_target = True
+		print("read target")
+	except:
+		print("not reading target")
+		pass
+	f.close()
+
+	if not read_target:
+		max_island.sticks = max_island_[2]
+
 	#for b in beetles:
 	#	b.state['act'] = 'idle'
 	for b in beetles:
@@ -296,34 +330,64 @@ def loop(load_state):
 				self.state['act'] = 'idle'
 			except Exception as e:
 				print(e)
+		elif glob.m[b.x, b.y] is not None and glob.m[b.x, b.y].sticks >= d['Smin']:
+			try:
+				conn.ignition(b.n)
+			except:
+				pass
 		elif b.state['act'] == 'idle':
 			if b.my_field.t == 'LAND':
+				# from time to time sabotage
+				if (b.role == 'CAPTAIN' and
+						(b.x, b.y) == (max_island.x, max_island.y) and
+						randint(0, 2) == 0):
+					b.state['give_stolen_first'] = True # this will make it give what it took here, to later take it back
+					try:
+						conn.take(b.n)
+					except:
+						pass
+					dist_w, sticks_w = 1, 0
+					b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
+					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
+					b.state['act'] = 'take_wood'
+					continue
 				if b.role == 'NONE':
-					dist_w, sticks_w = 30, 1
+					dist_w, sticks_w = 25, 1
 				else:
-					dist_w, sticks_w = 1, 1
-				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w))
+					dist_w, sticks_w = 2, 1
+				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
 				b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
-				b.state['target'] = (b.x, b.y)
+				b.state['return_to'] = (b.x, b.y)
 				b.state['act'] = 'take_wood'
-			else:
+				b.step(conn)
+			else: #natychmiastowa ewakuacja na najblizsza wyspe
 				dist_w, sticks_w = 1, 0
-				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w))
+				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
 				b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
 				b.state['act'] = 'rescue'
+				b.step(conn)
 		elif b.state['act'] == 'take_wood':
 			if b.state['route'] == [0, 0]:
+				if b.state.has_key('give_stolen_first'):
+					try:
+						conn.give(b.n)
+					except:
+						pass
+					del b.state['give_stolen_first']
+					continue
 				try:
 					conn.take(b.n)
 				except Exception as e:
 					print(e)
 				b.state['act'] = 'go_back'
-				if b.role == 'CAPTAIN':
-					dist_w, sticks_w = 1, 0
-					b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w))
-					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
+				if b.role == 'CAPTAIN' and max_island is not None:
+					b.state['route'] = [max_island.x - b.x, max_island.y - b.y]
 				else:
-					b.state['route'] = [b.state['target'][0] - b.x, b.state['target'][1] - b.y]
+					b.state['route'] = [b.state['return_to'][0] - b.x, b.state['return_to'][1] - b.y]
+				try:
+					b.step(conn)
+				except:
+					pass
 			else:
 				b.step(conn)
 		elif b.state['act'] == 'go_back':
@@ -333,7 +397,20 @@ def loop(load_state):
 				except Exception as e:
 					print(e)
 				b.state['act'] = 'idle'
+				try:
+					b.step(conn)
+				except:
+					pass
 			else:
+				if b.role == 'CAPTAIN':
+					need = 40
+				else:
+					need = 5
+				if b.sticks < need:
+					b.state['act'] = 'take_wood'
+					dist_w, sticks_w = 1, 1
+					b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
+					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
 				b.step(conn)
 		elif b.state['act'] == 'rescue':
 			if b.my_field.t == 'LAND': # saved!
@@ -343,6 +420,9 @@ def loop(load_state):
 
 
 	print_ar(beetles)
+
+	if max_island is not None:
+		print("my sticks on max island (%i %i): %i / %i" % (max_island.x, max_island.y, max_island.mysticks, max_island.sticks))
 
 	lands, waters = glob.m.dump()
 	write_file('lands', lands)
@@ -366,6 +446,9 @@ if __name__ == '__main__':
 	init_state(args.loadstate)
 	
 	try: # main loop
+		if not args.loadstate:
+			f = open(str(universum) + ".target", "w")
+			f.close()
 		loop(args.loadstate)
 		conn.wait()
 		while 1:
