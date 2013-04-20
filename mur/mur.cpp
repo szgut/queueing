@@ -232,21 +232,19 @@ int main() {
 						tuple<int,int,int>{0,-1,0},
 						tuple<int,int,int>{0,0,-1}
 					};
-					const vector<float> MAYBE = {1.f/D, 0.5f/D, 0.25f/D, 0.125f/D};
 					float taczes = 0;
-					for (int zz = 0; zz < int(D); ++zz) {
-						for (int yy = 0; yy < int(D); ++yy) {
-							for (int xx = 0; xx < int(D); ++xx) {
-								if (box(zz,yy,xx)) {
-									for (auto const& dir : szesc) {
-										int dx, dy, dz;
-										tie(dx, dy, dz) = dir;
-										int nx = x + xx + dx;
-										int ny = y + yy + dy;
-										int nz = h0 + zz + dz;
-										if (x <= nx && nx < int(x + D) && y <= ny && ny < int(y + D)) {
-											taczes += above(ny,nx) >= nz;
-										} else {
+					if (D <= 3) {
+						const static vector<float> MAYBE = {1.f/D, 0.5f/D, 0.25f/D, 0.125f/D};
+						for (int zz = 0; zz < int(D); ++zz) {
+							for (int yy = 0; yy < int(D); ++yy) {
+								for (int xx = 0; xx < int(D); ++xx) {
+									if (box(zz,yy,xx)) {
+										for (auto const& dir : szesc) {
+											int dx, dy, dz;
+											tie(dx, dy, dz) = dir;
+											int nx = x + xx + dx;
+											int ny = y + yy + dy;
+											int nz = h0 + zz + dz;
 											if (above(ny, nx) == nz) taczes++;
 											else if (
 												above(ny, nx) > nz &&
@@ -257,6 +255,25 @@ int main() {
 								}
 							}
 						}
+					} else {
+						int itaczes = 0;
+						for (int zz = 0; zz < int(D); ++zz) {
+							for (int yy = 0; yy < int(D); ++yy) {
+								for (int xx = 0; xx < int(D); ++xx) {
+									if (box(zz,yy,xx)) {
+										for (auto const& dir : szesc) {
+											int dx, dy, dz;
+											tie(dx, dy, dz) = dir;
+											int nx = x + xx + dx;
+											int ny = y + yy + dy;
+											int nz = h0 + zz + dz;
+											taczes += above(ny,nx) == nz;
+										}
+									}
+								}
+							}
+						}
+						taczes = itaczes;
 					}
 					// ~cerr << taczes << endl;
 					if (taczes >= k.pmin && h0 + D <= Z) {
