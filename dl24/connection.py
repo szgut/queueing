@@ -105,6 +105,14 @@ class Connection(object):
 		except (ForcedWaitingError, ConnectionResetError):
 			self.cmd(*what)	# repeat the command
 
+	def throwing_cmd(self, *what):
+		''' throws ForcedWaitingError '''
+		self.writeln(*what)
+		try:
+			self._read_ack()
+		except ConnectionResetError:
+			self.cmd(*what)	# repeat the command
+
 
 	def wait(self):
 		'''waits for next turn'''

@@ -260,6 +260,12 @@ def compute_dijkstras():
 
 
 point_comp = lambda point: (-maxrequests[point.i][point.j], fee0(point))
+def sort_used_points():
+	used_points.sort(key=point_comp)
+
+def update_permissions():
+	
+	sort_used_points()
 
 def solve():
 	global plan, used_points
@@ -296,7 +302,8 @@ def solve():
 	conn.declare_plan(plan)
 
 	
-	used_points = sorted([point for point in plan if point not in saturated and point not in permissions], key=point_comp)
+	used_points = [point for point in plan if point not in saturated and point not in permissions]
+	sort_used_points()
 
 
 def obtain_permission():
