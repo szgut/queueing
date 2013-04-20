@@ -48,7 +48,7 @@ class Beetle(object):
 		else:
 			l1 = ("B%i(%i, %i) on island with %i sticks (%i not mine)" %
 				(self.n, self.x, self.y, glob.m[self.x, self.y].sticks, glob.m[self.x, self.y].sticks - glob.m[self.x, self.y].mysticks))
-		l2 = repr(self.state)
+		l2 = '\t' + repr(self.state)
 		return '\n'.join([l1, l2])
 
 	def f(self):
@@ -288,6 +288,7 @@ def loop(load_state):
 	isl = list(glob.m.get_islands())
 
 	glob.max_sticks = max(map(lambda i: i[2], t['islands']))
+
 	max_island_ = max(t['islands'], key = lambda i: i[2])
 	if glob.m[max_island_[0], max_island_[1]] is None:
 		fbest = Field(max_island_[0], max_island_[1])
@@ -295,8 +296,24 @@ def loop(load_state):
 		fbest.sticks = max_island_[2]
 		fbest.mysticks = 0
 		glob.m.update([fbest])
-	glob.max_island = glob.m[max_island_[0], max_island_[1]]
-	glob.max_island.sticks = max_island_[2]
+	max_island = glob.m[max_island_[0], max_island_[1]]
+
+	read_target = False
+	f = open(str(universum) + ".target", "r")
+	try:
+		x, y = f.readlines()[0].split(' ')
+		x = int(x)
+		y = int(y)
+		max_island = glob.m[x, y]
+		read_target = True
+		print("read target")
+	except:
+		print("not reading target")
+		pass
+	f.close()
+
+	if not read_target:
+		max_island.sticks = max_island_[2]
 
 	#for b in beetles:
 	#	b.state['act'] = 'idle'
@@ -321,10 +338,21 @@ def loop(load_state):
 		elif b.state['act'] == 'idle':
 			if b.my_field.t == 'LAND':
 				# from time to time sabotage
-				if b.role == 'CAPTAIN' and randint(0, 7) == 0:
-					pass
+				if (b.role == 'CAPTAIN' and
+						(b.x, b.y) == (max_island.x, max_island.y) and
+						randint(0, 2) == 0):
+					b.state['give_stolen_first'] = True # this will make it give what it took here, to later take it back
+					try:
+						conn.take(b.n)
+					except:
+						pass
+					dist_w, sticks_w = 1, 0
+					b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
+					b.state['route'] = [b.closest.x - b.x, b.closest.y - b.y]
+					b.state['act'] = 'take_wood'
+					continue
 				if b.role == 'NONE':
-					dist_w, sticks_w = 10, 1
+					dist_w, sticks_w = 25, 1
 				else:
 					dist_w, sticks_w = 2, 1
 				b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
@@ -340,13 +368,20 @@ def loop(load_state):
 				b.step(conn)
 		elif b.state['act'] == 'take_wood':
 			if b.state['route'] == [0, 0]:
+				if b.state.has_key('give_stolen_first'):
+					try:
+						conn.give(b.n)
+					except:
+						pass
+					del b.state['give_stolen_first']
+					continue
 				try:
 					conn.take(b.n)
 				except Exception as e:
 					print(e)
 				b.state['act'] = 'go_back'
-				if b.role == 'CAPTAIN' and glob.max_island is not None:
-					b.state['route'] = [glob.max_island.x - b.x, glob.max_island.y - b.y]
+				if b.role == 'CAPTAIN' and max_island is not None:
+					b.state['route'] = [max_island.x - b.x, max_island.y - b.y]
 				else:
 					b.state['route'] = [b.state['return_to'][0] - b.x, b.state['return_to'][1] - b.y]
 				try:
@@ -386,8 +421,8 @@ def loop(load_state):
 
 	print_ar(beetles)
 
-	if glob.max_island is not None:
-		print("my sticks on max island (%i %i): %i / %i" % (glob.max_island.x, glob.max_island.y, glob.max_island.mysticks, glob.max_island.sticks))
+	if max_island is not None:
+		print("my sticks on max island (%i %i): %i / %i" % (max_island.x, max_island.y, max_island.mysticks, max_island.sticks))
 
 	lands, waters = glob.m.dump()
 	write_file('lands', lands)
@@ -411,6 +446,9 @@ if __name__ == '__main__':
 	init_state(args.loadstate)
 	
 	try: # main loop
+		if not args.loadstate:
+			f = open(str(universum) + ".target", "w")
+			f.close()
 		loop(args.loadstate)
 		conn.wait()
 		while 1:
