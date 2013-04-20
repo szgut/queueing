@@ -42,10 +42,18 @@ class Beetle(object):
 		pass
 
 	def __repr__(self):
-		l1 = color(GREEN, ("B%i(%i, %i)\t%s st:%i busy:%i rt:%s act:%s" %
-			(self.n, self.x, self.y, self.role, self.sticks, self.busy, self.state['route'], self.state['act'])))
-		l2 = '\t' + repr(self.state)
-		return '\n'.join([l1, l2])
+		if self.state.has_key('give_stolen_first'):
+			stealing = "!stealing!"
+		else:
+			stealing = ""
+		l1 = ("B%i(%i, %i)\t%s st:%i busy:%i rt:%s act:%s %s" %
+			(self.n, self.x, self.y, self.role, self.sticks, self.busy, self.state['route'], self.state['act'], stealing))
+		l2 = repr(self.state)
+		l3 = ''
+		if self.my_field.t == 'LAND':
+			l3 = color(GREEN, ("\ton island with %i sticks (%i not mine)" %
+					(glob.m[self.x, self.y].sticks, glob.m[self.x, self.y].sticks - glob.m[self.x, self.y].mysticks)))
+		return ' '.join(filter(lambda x: x != '', [l1, l3]))
 
 	def f(self):
 		ar = [
