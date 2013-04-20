@@ -361,6 +361,7 @@ def loop():
 				print info('brak mi ' + str(x))
 				gs.bricks[x] = conn.brick(x)
 	
+	print info('czas na ture: '), gs.world.T
 	sleep(0.6)
 	
 	print info('spogladam z gory')

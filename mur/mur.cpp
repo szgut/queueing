@@ -185,7 +185,7 @@ int main() {
 	uns X = in, Y = in, Z = in;
 	
 	Matrix above(X + 2, Y + 2, in);
-	Box znane(X + 2, Y + 2, Z + 1, 0);
+	Box znane(X + 2, Y + 2, Z + 2, 0);
 	int Madept = in;
 	for (uns y = 1; y <= Y; ++y) {
 		for (uns x = 1; x <= X; ++x) {
@@ -260,7 +260,7 @@ int main() {
 							}
 						}
 					}
-					if (taczes >= k.pmin && h0 + D <= Z) {
+					if (taczes >= k.pmin && h0 + D < Z) {
 						float score = k.weight * (Cv * box.volume() + Cp * taczes);
 						elems.emplace_back(-score, k.id, rid, x, y, taczes, h0);
 					}
