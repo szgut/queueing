@@ -184,14 +184,21 @@ int main() {
 	float Cv = in, Cp = in;
 	uns X = in, Y = in, Z = in;
 	
-	uns Poczatek = in, Zakoniec = in;
-	Box znane(X + 2, Y + 2, Zakoniec - Poczatek, in);
-	
-	Matrix above(X + 2, Y + 2, in);	
+	Matrix above(X + 2, Y + 2, in);
+	Box znane(X + 2, Y + 2, Z + 1, 0);
+	int Madept = in;
+	for (uns y = 1; y <= Y; ++y) {
+		for (uns x = 1; x <= X; ++x) {
+			for (int z = max(1, above(y,x) - Madept); z <= above(y,x); ++z)
+				if (int(in) == 2) znane(z,y,x) = 1;
+		}
+	}
 	
 	uns D = in;
 	uns nshapes = in;
 	vector<Klocek> shapes;
+	
+	cerr << "D B " << D << " " << nshapes << endl;
 	
 	map<uns, Box> m;
 	while (nshapes--) {
@@ -247,9 +254,7 @@ int main() {
 										uns nx = x + xx + dx;
 										uns ny = y + yy + dy;
 										uns nz = h0 + zz + dz;
-										if (Poczatek <= nz && nz < Zakoniec)
-											taczes += znane(nz - Poczatek, ny, nx) >> 1;
-										else taczes += uns(above(ny, nx)) == nz;
+										taczes += znane(nz, ny, nx) || uns(above(ny, nx)) == nz;
 									}
 								}
 							}

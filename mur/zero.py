@@ -260,16 +260,6 @@ def cepepe():
 	print>>ipu, gs.world.Cv, gs.world.Cp
 	print>>ipu, gs.world.X, gs.world.Y, gs.world.Z + 1
 	
-	zakoniec = gs.above.max() + 1
-	poczatek = max(0, zakoniec - (20 if gs.world.D == 2 else 11))
-	print>>ipu, poczatek, zakoniec
-	for z in xrange(poczatek, zakoniec):
-		# ~print z, gs.world.Z + 1
-		print>>ipu, '0 '*(gs.world.X + 2)
-		for y in xrange(gs.world.Y):
-			print>>ipu, '0 ' + (' '.join(map(str, gs.wszystko[z,y].flat))) + ' 0'
-		print>>ipu, '0 '*(gs.world.X + 2)
-		print>>ipu
 	
 	for _ in xrange(gs.world.X + 2): print>>ipu, 0,
 	print>>ipu
@@ -282,6 +272,21 @@ def cepepe():
 		
 	for _ in xrange(gs.world.X + 2): print>>ipu, 0,
 	print>>ipu
+	
+	
+	
+	madept = 13 if gs.world.D == 2 else 9
+	
+	print>>ipu, madept
+	
+	for y in xrange(gs.world.Y):
+		for x in xrange(gs.world.X):
+			for z in xrange(max(1, gs.above[y,x] - madept), gs.above[y,x] + 1):
+				print>>ipu, gs.wszystko[z,y,x],
+			print>>ipu
+	
+	
+	print "py: D B", gs.world.D, gs.world.B
 	
 	print>>ipu, gs.world.D
 	
@@ -398,6 +403,8 @@ def loop():
 	gs.above = conn.above()
 	bdiff = blur(gs.above - gs.prabove)
 	
+	aboma = gs.above.max()
+	
 	while True:
 		try:
 			y, x = np.unravel_index(bdiff.argmax(), bdiff.shape)
@@ -406,7 +413,11 @@ def loop():
 				break
 			z = gs.above[y,x] - 3
 			if z < 3: z = 3
-			bdiff[y-3:y+4, x-3:x+4] = 0
+			if y < 3: y = 3
+			if x < 3: x = 3
+			if x >= gs.world.X - 3: x = gs.world.X - 4
+			if y >= gs.world.Y - 3: y = gs.world.Y - 4
+			bdiff[y-6:y+7, x-6:x+7] = 0
 			print info('asking for'), x, y, z
 			ret = np.array(conn.cube(x,y,z))
 			if ret.shape != (7,7,7):
