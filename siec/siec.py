@@ -106,7 +106,8 @@ class FindUnion(object):
 		return self.size[point.i][point.j]
 
 	def merge(self, a, b):
-		if a == b: return
+		if self.same(a, b): return
+		#if a == b: return
 		a, b = self._root(a.i, a.j), self._root(b.i, b.j)
 		if self._size(a) > self._size(b):
 			self.boss[b.i][b.j] = a
@@ -155,7 +156,7 @@ def adjacent(point):
 
 def fee1(place):
 	city_cost = 1
-	k = 100000
+	k = 1000000
 	if place in saturated:
 		return C*k*fee[place.i][place.j] or city_cost
 	return k*fee[place.i][place.j] or city_cost
@@ -166,7 +167,7 @@ def fee0(place):
 
 def feeA(place):
 	city_cost = 1
-	k = 100000
+	k = 1000000
 	return k*fee0(place) or city_cost
 
 
@@ -202,25 +203,11 @@ def dumppoints(items, path):
 
 
 
-
-# def dfs_dist(pointa, pointb):
-# 	return abs(pointa.i - pointb.i) + abs(pointa.j - pointb.j)
-
-# def dfs_route(pointa, pointb):
-# 	''' returns points between pointa and pointb (excluding) '''
-# 	dj = 1 if pointb.j > pointa.j else -1
-# 	di = 1 if pointb.i > pointa.i else -1
-# 	for j in xrange(pointa.j+dj, pointb.j+dj, dj):
-# 		yield Point(pointa.i, j)
-# 	for i in xrange(pointa.i+di, pointb.i, di):
-# 		yield Point(i, pointb.j)
-
-
 def dijkstra_dists(city):
 	feeN = feeA if args.accurate else fee1
 	done = set()
-	results = tdarr(lambda i,j: 10**9)
-	results[city.i][city.j] = fee1(city)
+	results = tdarr(lambda i,j: 10**12)
+	results[city.i][city.j] = feeN(city)
 	heap = [(feeN(city), city)]
 	while heap:
 		dist, pt = heapq.heappop(heap)
@@ -243,10 +230,20 @@ def dijkstra_route(city, dest, dijkstras):
 	while city != dest:
 		dist_city = results[city.i][city.j]
 		for neigh in adjacent(city):
+			# if!
+			# if fu._size(neigh) > 1 and not fu.same(city, neigh):
+			# 	yield neigh
+			# 	break
+			boss = fu.boss[neigh.i][neigh.j]
+			if fu._size(boss) > 1:
+				fu.merge(city, neigh)
+
 			dist_neigh = results[neigh.i][neigh.j]
 			if dist_neigh + feeN(city) == dist_city:
 				yield neigh
 				city = neigh
+	# if city==dest:
+	# 	yield dest
 
 
 def dot():
@@ -269,7 +266,7 @@ def compute_dijkstras():
 
 
 
-point_comp = lambda point: (-min(maxrequests[point.i][point.j],3), fee0(point))
+point_comp = lambda point: (-min(maxrequests[point.i][point.j],4), fee0(point))
 def sort_used_points():
 	used_points.sort(key=point_comp)
 
@@ -286,7 +283,7 @@ def update_permissions():
 	sort_used_points()
 
 def solve():
-	global plan, used_points
+	global plan, used_points, fu
 	fu = FindUnion()
 	dijkstras = compute_dijkstras()
 	
@@ -304,11 +301,14 @@ def solve():
 	plan = []
 	for dist, a, b in cities_dists:
 		if not fu.same(a, b):
-			#plan.extend(dfs_route(a, b))
-			plan.extend(dijkstra_route(a, b, dijkstras))
+			route = list(dijkstra_route(a, b, dijkstras))
+			for r in route:
+				fu.merge(a,r)
+			plan.extend(route)
+			#plan.extend(dijkstra_route(a, b, dijkstras))
 			dot()
-			# plan.extend(dijkstra_route(dijkstra_results[b.i][b.j], a, b))
 			fu.merge(a,b)
+			# fu.merge(a, route[-1])
 	print
 	plan.extend(cities)
 	plan = set(plan)
