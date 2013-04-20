@@ -42,12 +42,8 @@ class Beetle(object):
 		pass
 
 	def __repr__(self):
-		if self.my_field.t == 'WATER':
-			l1 = ("B%i(%i, %i)\tst:%i busy:%i %s close: %s rt:%s" %
-				(self.n, self.x, self.y, self.sticks, self.busy, self.role, self.closest, self.state['route']))
-		else:
-			l1 = ("B%i(%i, %i) on island with %i sticks (%i not mine)" %
-				(self.n, self.x, self.y, glob.m[self.x, self.y].sticks, glob.m[self.x, self.y].sticks - glob.m[self.x, self.y].mysticks))
+		l1 = ("B%i(%i, %i)\tst:%i busy:%i %s close: %s rt:%s" %
+			(self.n, self.x, self.y, self.sticks, self.busy, self.role, self.closest, self.state['route']))
 		l2 = '\t' + repr(self.state)
 		return '\n'.join([l1, l2])
 
@@ -156,8 +152,6 @@ class Field(object):
 			sticks_n = (min(40, float(f.sticks) - f.mysticks)) / 40
 		else:
 			sticks_n = (float(f.sticks) - f.mysticks) / glob.max_sticks
-		if f.sticks - f.mysticks == 0:
-			return 0
 		return dist_w*dist_n + sticks_w*sticks_n
 
 	@staticmethod
@@ -313,6 +307,13 @@ def loop(load_state):
 		pass
 	f.close()
 
+	f = open(str(universum) + ".strategy", "r")
+	try:
+		prop = int(f.readlines()[0].strip())
+	except:
+		prop = 10
+		print("problem reading strategy file!")
+
 	if not read_target:
 		max_island.sticks = max_island_[2]
 
@@ -341,11 +342,12 @@ def loop(load_state):
 				# from time to time sabotage
 				if (b.role == 'CAPTAIN' and
 						(b.x, b.y) == (max_island.x, max_island.y) and
-						randint(0, 2) == 0):
+						randint(0, prop-1) == 0):
 					try:
 						conn.take(b.n)
 						b.state['give_stolen_first'] = True # this will make it give what it took here, to later take it back
-					except:
+					except Exception as e:
+						print(e)
 						continue
 					dist_w, sticks_w = 1, 0
 					b.closest = max(other_isl, key = Field.dist_from(b.x, b.y, dist_w, sticks_w, True))
@@ -419,12 +421,14 @@ def loop(load_state):
 	print_ar(beetles)
 
 	if max_island is not None:
-		print("my sticks on target island (%i %i):\t%i / %i" % (max_island.x, max_island.y, max_island.mysticks, max_island.sticks))
+		print("my sticks on target\tisland (%i %i):\t%i / %i" % (max_island.x, max_island.y, max_island.mysticks, max_island.sticks))
 	mx, my = t['islands'][0][0], t['islands'][0][1]
 	msticks = t['islands'][0][2]
 	if glob.m[mx, my] is not None:
 		glob_max = glob.m[mx, my]
-		print("my sticks on max island (%i %i):\t%i / %i" % (glob_max.x, glob_max.y, glob_max.mysticks, msticks))
+		print("my sticks on max\tisland (%i %i):\t%i / %i" % (glob_max.x, glob_max.y, glob_max.mysticks, msticks))
+
+	print("current strategy: 1/%i probability of theft" % prop)
 
 	lands, waters = glob.m.dump()
 	write_file('lands', lands)
@@ -450,6 +454,9 @@ if __name__ == '__main__':
 	try: # main loop
 		if not args.loadstate:
 			f = open(str(universum) + ".target", "w")
+			f.close()
+			f = open(str(universum) + ".strategy", "w")
+			f.write("20")
 			f.close()
 		loop(args.loadstate)
 		conn.wait()
