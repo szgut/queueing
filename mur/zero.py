@@ -418,8 +418,8 @@ def loop():
 			if x < 3: x = 3
 			if x >= gs.world.X - 3: x = gs.world.X - 4
 			if y >= gs.world.Y - 3: y = gs.world.Y - 4
-			bdiff[y-6:y+7, x-6:x+7] = 0
-			print info('asking for'), x, y, z
+			bdiff[y-3:y+4, x-3:x+4] *= 0
+			print info('asking for'), x, y, z, ':', bdiff[y,x]
 			ret = np.array(conn.cube(x,y,z))
 			if ret.shape != (7,7,7):
 				print bad('wtf! nie 777'), ret.shape
