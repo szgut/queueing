@@ -261,7 +261,7 @@ def cepepe():
 	print>>ipu, gs.world.X, gs.world.Y, gs.world.Z + 1
 	
 	zakoniec = gs.above.max() + 1
-	poczatek = max(0, zakoniec - 20)
+	poczatek = max(0, zakoniec - (20 if gs.world.D == 2 else 11))
 	print>>ipu, poczatek, zakoniec
 	for z in xrange(poczatek, zakoniec):
 		# ~print z, gs.world.Z + 1
