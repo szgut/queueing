@@ -3,7 +3,7 @@
 import dl24.connection
 from dl24.misc import Serializer
 from dl24.misc import delay_sigint
-from dl24.colors import warn, bad, good, info
+from dl24.colors import warn, bad, good, info, color, GREEN
 import argparse
 import traceback
 
@@ -42,8 +42,8 @@ class Beetle(object):
 		pass
 
 	def __repr__(self):
-		l1 = ("B%i(%i, %i)\tst:%i busy:%i %s close: %s rt:%s" %
-			(self.n, self.x, self.y, self.sticks, self.busy, self.role, self.closest, self.state['route']))
+		l1 = color(GREEN, ("B%i(%i, %i)\t%s st:%i busy:%i rt:%s act:%s" %
+			(self.n, self.x, self.y, self.role, self.sticks, self.busy, self.state['route'], self.state['act'])))
 		l2 = '\t' + repr(self.state)
 		return '\n'.join([l1, l2])
 
