@@ -278,12 +278,12 @@ int main() {
 		uns id, rid, x, y, h0;
 		tie(score, id, rid, x, y, taczes, h0) = e;
 		
-		if (piec) {
-			piec--;
-			cerr << m[id] << " " << m[id].rot(rots[rid]) << endl;
-			cerr << x << " " << y << "    taczes " << taczes << "     h0 " << h0 << endl;
-			cerr << above.slice(y-1, x-1, 4) << endl;
-		}
+		// ~if (piec) {
+			// ~piec--;
+			// ~cerr << m[id] << " " << m[id].rot(rots[rid]) << endl;
+			// ~cerr << x << " " << y << "    taczes " << taczes << "     h0 " << h0 << endl;
+			// ~cerr << above.slice(y-1, x-1, 4) << endl;
+		// ~}
 		
 		cout << -score << " " << id << " "<< rid << " " <<  (x-1) << " " << (y-1) << endl;
 		//w pythu mam indeksowanie od 0

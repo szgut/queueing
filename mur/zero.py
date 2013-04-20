@@ -120,7 +120,7 @@ class Connection(dl24.connection.Connection):
 		(raz, dwa, x, y) = x
 		zzz = (raz, dwa, x+1, y+1)
 		print "drop", zzz, "/", (gs.world.X, gs.world.Y, gs.world.Z)
-		print self.above()[y-1:y+3, x-1:x+3]
+		# ~print self.above()[y-1:y+3, x-1:x+3]
 		
 		self.cmd_drop_brick(zzz)
 		blah = self._readstr_assert(['ACCEPTED', 'REJECTED_HEIGHT', 'REJECTED_MATCH'])
@@ -128,7 +128,7 @@ class Connection(dl24.connection.Connection):
 		elif blah == 'REJECTED_HEIGHT': raise RejectedHeight
 		else: raise RejectedMatch
 		
-		print self.above()[y-1:y+3, x-1:x+3]
+		# ~print self.above()[y-1:y+3, x-1:x+3]
 		return ret
 	
 	def bricks(self):
