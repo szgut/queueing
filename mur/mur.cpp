@@ -232,8 +232,7 @@ int main() {
 						tuple<int,int,int>{0,-1,0},
 						tuple<int,int,int>{0,0,-1}
 					};
-					const float MAYBE = 0;
-					const float MAYBE1 = 0;
+					const vector<float> MAYBE = {0.6, 0.4, 0.2, 0.1};
 					float taczes = 0;
 					for (int zz = 0; zz < int(D); ++zz) {
 						for (int yy = 0; yy < int(D); ++yy) {
@@ -249,8 +248,10 @@ int main() {
 											taczes += above(ny,nx) >= nz;
 										} else {
 											if (above(ny, nx) == nz) taczes++;
-											else if (above(ny, nx) == nz + 1) taczes += MAYBE1;
-											else taczes += MAYBE * (above(ny,nx) >= nz);
+											else if (
+												above(ny, nx) > nz &&
+												above(ny, nx) <= nz + 4 
+											) taczes += MAYBE.at(above(ny, nx) - nz - 1);
 										}
 									}
 								}
@@ -272,7 +273,7 @@ int main() {
 	if (elems.size() > 666) elems.resize(666);
 	cerr << "wypisuję" << endl;
 	cout << elems.size() << endl;
-	int piec = 1;
+	// ~int piec = 1;
 	for (E const& e : elems) {
 		float score, taczes;
 		uns id, rid, x, y, h0;
