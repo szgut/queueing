@@ -233,7 +233,7 @@ int main() {
 						tuple<int,int,int>{0,0,-1}
 					};
 					float taczes = 0;
-					if (D <= 3) {
+					if (D <= 5) {
 						const static vector<float> MAYBE = {1.f/D, 0.5f/D, 0.25f/D, 0.125f/D};
 						for (int zz = 0; zz < int(D); ++zz) {
 							for (int yy = 0; yy < int(D); ++yy) {
