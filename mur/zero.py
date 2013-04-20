@@ -131,6 +131,18 @@ class Connection(dl24.connection.Connection):
 		# ~print self.above()[y-1:y+3, x-1:x+3]
 		return ret
 	
+	def _eat_cube(self, bok, string=True):
+		def _getslice():
+			if string:
+				li = [ self.readline() for x in range(bok) ]
+			else:
+				li = [ [ (1 if c == '#' else 0) for c in self.readline() ] for x in range(bok) ]
+			li.reverse() # odwracamy y
+			return li
+		li = [ _getslice() for x in range(bok) ]
+		# zty sa ok!
+		return li
+	
 	def bricks(self):
 		self.cmd_list_bricks()
 		return self.readints(gs.world.B)
@@ -139,19 +151,25 @@ class Connection(dl24.connection.Connection):
 		self.cmd_show_brick(x)
 		w = self.readfloat()
 		pmin = self.readint()
-		def _getslice():
-			li = [ self.readline() for x in range(gs.world.D) ]
-			li.reverse() # odwracamy y
-			return li
-		li = [ _getslice() for x in range(gs.world.D) ]
-		# zty sa ok!
-		return Brick(w, pmin, li)
+		return Brick(w, pmin, self._eat_cube(gs.world.D))
 	
 	def above(self):
 		self.cmd_view_from_above()
 		li = [ [conn.readint() for x in range(gs.world.X)] for x in range(gs.world.Y)]
 		li.reverse()
 		return np.matrix(li)
+	
+	def cube(self, x, y, z):
+		# pytamy o normalne (odzera) wspolrzedne
+		if 3 <= x < gs.world.X - 3 and 3 <= y < gs.world.Y - 3 and 3 <= z < gs.world.Z - 3:
+			x += 1
+			y += 1
+			# zty indeksujemy tak samo
+			self.throwing_cmd("DESCRIBE_WALL", 7, x, y, z)
+			return self._eat_cube(7, string=False)
+		else:
+			print bad('wtf, gdzie te kostke pytasz'), x, y, z, gs.world.X, gs.world.Y, gs.world.Z
+			raise Exception
 
 
 class Brick(object):
@@ -240,7 +258,18 @@ def init_state(read):
 def cepepe():
 	opu, ipu = popen2("./mur");
 	print>>ipu, gs.world.Cv, gs.world.Cp
-	print>>ipu, gs.world.X, gs.world.Y, gs.world.Z
+	print>>ipu, gs.world.X, gs.world.Y, gs.world.Z + 1
+	
+	zakoniec = gs.above.max() + 1
+	poczatek = max(0, zakoniec - 20)
+	print>>ipu, poczatek, zakoniec
+	for z in xrange(poczatek, zakoniec):
+		# ~print z, gs.world.Z + 1
+		print>>ipu, '0 '*(gs.world.X + 2)
+		for y in xrange(gs.world.Y):
+			print>>ipu, '0 ' + (' '.join(map(str, gs.wszystko[z,y].flat))) + ' 0'
+		print>>ipu, '0 '*(gs.world.X + 2)
+		print>>ipu
 	
 	for _ in xrange(gs.world.X + 2): print>>ipu, 0,
 	print>>ipu
@@ -299,6 +328,20 @@ class Napykalacz(Thread):
 			except:
 				pass
 
+def blur(m, r = 3):
+	nm = m.copy()
+	for i in xrange(1,r+1):
+		nm[i:, :] += m[:-i,:]
+		nm[:-i, :] += m[i:,:]
+		nm[:, i:] += m[:, :-i]
+		nm[:, :-i] += m[:, i:]
+		for j in xrange(1,r+1):
+			nm[i:, j:]  += m[:-i, :-j]
+			nm[i:, :-j] += m[:-i, j:]
+			nm[:-i, j:] += m[i:, :-j]
+			nm[:-i, :-j]+= m[i:, j:]
+	return nm
+
 zmienna_statyczna = [1]
 def loop():	
 	with delay_sigint():
@@ -316,7 +359,25 @@ def loop():
 	sleep(0.6)
 	
 	print info('spogladam z gory')
-	gs.above = conn.above()
+	if hasattr(gs, "above"):
+		gs.prabove = gs.above
+		gs.above = conn.above()
+		nowy = False
+	else:
+		nowy = True
+		gs.above = conn.above()
+	
+	if nowy or gs.above.shape != gs.prabove.shape or not (gs.above >= gs.prabove).all():
+		print good('nowy swiat!')
+		gs.prabove = np.empty(gs.above.shape, dtype=int)
+		gs.prabove.fill(0)
+		gs.wszystko = np.empty((gs.world.Z + 1, gs.world.Y, gs.world.X), dtype=np.uint8)
+		gs.wszystko.fill(0)
+		for y in xrange(gs.world.Y):
+			for x in xrange(gs.world.X):
+				for z in xrange(gs.prabove[y,x] + 1, gs.above[y,x]):
+					gs.wszystko[z,y,x] |= 1
+				gs.wszystko[gs.above[y,x], y, x] = 2
 	
 	print info('szukam')
 	lista = cepepe()
@@ -329,7 +390,33 @@ def loop():
 		except RejectedBrick:
 			pass
 		except:
+			print bad('wtf? nie rejected to co?')
 			pass
+	
+	gs.prabove = gs.above
+	gs.above = conn.above()
+	bdiff = blur(gs.above - gs.prabove)
+	
+	while True:
+		try:
+			y, x = np.unravel_index(bdiff.argmax(), bdiff.shape)
+			if bdiff[y,x] <= 0:
+				conn.wait()
+				break
+			z = gs.above[y,x] - 3
+			if z < 3: z = 3
+			bdiff[y-3:y+4, x-3:x+4] = 0
+			print info('asking for'), x, y, z
+			ret = np.array(conn.cube(x,y,z))
+			if ret.shape != (7,7,7):
+				print bad('wtf! nie 777'), ret.shape
+				raise Exception
+			gs.wszystko[z-3:z+4, y-3:y+4, x-3:x+4] |= ret * 2
+		except dl24.connection.ForcedWaitingError:
+			break
+		except:
+			conn.wait()
+			break			
 
 
 if __name__ == '__main__':
@@ -345,7 +432,7 @@ if __name__ == '__main__':
 		conn.wait()
 		while 1:
 			loop()
-			conn.wait()
+			# ~conn.wait()
 	except KeyboardInterrupt:
 		serializer.save(gs)
 	except:

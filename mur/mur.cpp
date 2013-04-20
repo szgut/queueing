@@ -183,6 +183,10 @@ int main() {
 	
 	float Cv = in, Cp = in;
 	uns X = in, Y = in, Z = in;
+	
+	uns Poczatek = in, Zakoniec = in;
+	Box znane(X + 2, Y + 2, Zakoniec - Poczatek, in);
+	
 	Matrix above(X + 2, Y + 2, in);	
 	
 	uns D = in;
@@ -232,50 +236,25 @@ int main() {
 						tuple<int,int,int>{0,-1,0},
 						tuple<int,int,int>{0,0,-1}
 					};
-					float taczes = 0;
-					if (D <= 3) {
-						const static vector<float> MAYBE = {1.f/D, 0.5f/D, 0.25f/D, 0.125f/D};
-						for (int zz = 0; zz < int(D); ++zz) {
-							for (int yy = 0; yy < int(D); ++yy) {
-								for (int xx = 0; xx < int(D); ++xx) {
-									if (box(zz,yy,xx)) {
-										for (auto const& dir : szesc) {
-											int dx, dy, dz;
-											tie(dx, dy, dz) = dir;
-											int nx = x + xx + dx;
-											int ny = y + yy + dy;
-											int nz = h0 + zz + dz;
-											if (above(ny, nx) == nz) taczes++;
-											else if (
-												above(ny, nx) > nz &&
-												above(ny, nx) <= nz + 4 
-											) taczes += MAYBE.at(above(ny, nx) - nz - 1);
-										}
+					int taczes = 0;
+					for (int zz = 0; zz < int(D); ++zz) {
+						for (int yy = 0; yy < int(D); ++yy) {
+							for (int xx = 0; xx < int(D); ++xx) {
+								if (box(zz,yy,xx)) {
+									for (auto const& dir : szesc) {
+										int dx, dy, dz;
+										tie(dx, dy, dz) = dir;
+										uns nx = x + xx + dx;
+										uns ny = y + yy + dy;
+										uns nz = h0 + zz + dz;
+										if (Poczatek <= nz && nz < Zakoniec)
+											taczes += znane(nz - Poczatek, ny, nx) >> 1;
+										else taczes += uns(above(ny, nx)) == nz;
 									}
 								}
 							}
 						}
-					} else {
-						int itaczes = 0;
-						for (int zz = 0; zz < int(D); ++zz) {
-							for (int yy = 0; yy < int(D); ++yy) {
-								for (int xx = 0; xx < int(D); ++xx) {
-									if (box(zz,yy,xx)) {
-										for (auto const& dir : szesc) {
-											int dx, dy, dz;
-											tie(dx, dy, dz) = dir;
-											int nx = x + xx + dx;
-											int ny = y + yy + dy;
-											int nz = h0 + zz + dz;
-											taczes += above(ny,nx) == nz;
-										}
-									}
-								}
-							}
-						}
-						taczes = itaczes;
 					}
-					// ~cerr << taczes << endl;
 					if (taczes >= k.pmin && h0 + D <= Z) {
 						float score = k.weight * (Cv * box.volume() + Cp * taczes);
 						elems.emplace_back(-score, k.id, rid, x, y, taczes, h0);
