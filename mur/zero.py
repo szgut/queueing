@@ -256,7 +256,7 @@ def init_state(read):
 
 
 def cepepe():
-	opu, ipu = popen2("./mur");
+	opu, ipu = popen2("tee ipu%d | ./mur" % gs.world.D);
 	print>>ipu, gs.world.Cv, gs.world.Cp
 	print>>ipu, gs.world.X, gs.world.Y, gs.world.Z + 1
 	
