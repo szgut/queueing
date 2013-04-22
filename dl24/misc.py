@@ -5,6 +5,7 @@ import contextlib
 import cPickle as pickle
 import colors
 import time
+import heapq
 
 def insist(exception=KeyboardInterrupt, wait=None):
 	def decorator(fun):
@@ -60,3 +61,49 @@ def delay_sigint():
 	signal.signal(signal.SIGINT, default_handler)
 	if exc[0]:
 		raise KeyboardInterrupt
+
+
+class sortedset(object):
+	def __init__(self, items=None, keyfun=None):
+		self._keyfun = keyfun
+		self._heap = []
+		self._correct_kvals = {}
+		if items is not None:
+			self.add_all(items)
+
+	def add(self, item, key=None):
+		kval = self._keyfun(item) if self._keyfun is not None else key
+		heapq.heappush(self._heap, (kval, item))
+		self._correct_kvals[item] = kval
+
+	def remove(self, item):
+		del self._correct_kvals[item]
+
+	def add_all(self, items):
+		for item in items:
+			self.add(item)
+
+	keychanged = add
+
+	def top(self):
+		while self._heap:
+			kval, item = self._heap[0]
+			if kval == self._correct_kvals.get(item, (item,)):
+				return item
+			else:
+				heapq.heappop(self._heap)
+		raise IndexError("pop from empty sortedset")
+
+	def pop(self):
+		item = self.top()
+		del self._correct_kvals[item]
+		heapq.heappop(self._heap)
+		return item
+
+
+	def __contains__(self, item):
+		return item in self._correct_kvals
+
+	def __repr__(self):
+		key = lambda item: self._correct_kvals[item]
+		return "sortedset(%s)" % repr(sorted(self._correct_kvals, key=key))

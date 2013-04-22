@@ -26,8 +26,10 @@ def readint(f):	return int(token(f))
 def readfloat(f): return float(token(f))
 def readstr(f): return token(f).split()[0]
 def readline(f):
-	line = whole_line(f)
-	return line if line.split() else readline(f)
+	while 1:
+		line = whole_line(f)
+		if line.split():
+			return line
 
 if __name__ == '__main__':
 	#from sys import stdin as inp
