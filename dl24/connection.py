@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from colors import bad, warn, info, good
 import socket
+import log
 import scanf
 import misc
 	
@@ -21,23 +21,23 @@ class Connection(object):
 	def __init__(self, host='localhost', port=20003):
 		self._host = host
 		self._port = port
-		self._connectNlogin()
+		self._connect_and_login()
 
 
 	def __getattr__(self, name):
-		'''cmd_STH forward to cmd(), else forward to self.f'''
+		'''cmd_STH forward to cmd() '''
 		if name.startswith("cmd_"):
 			def clo(*what):
 				return self.cmd(name[4:].upper(), *what)
-			return clo 
+			return clo
 		else:
-			return getattr(self.f, name)
+			raise AttributeError(name)
 	
 	def _catch_read(self, fun):
-		try: return fun(self)
+		try: return fun(self.f)
 		except EOFError:
-			print warn("połączenie zerwane")
-			self._connectNlogin()
+			log.warn("połączenie zerwane")
+			self._connect_and_login()
 			raise ConnectionResetError
 	
 	def readint(self):   return self._catch_read(scanf.readint)
@@ -45,7 +45,7 @@ class Connection(object):
 	def readstr(self):   return self._catch_read(scanf.readstr)
 	def readline(self):  return self._catch_read(scanf.readline)
 	def readints(self, n):
-		return map(lambda _: self.readint(), xrange(n))
+		return list(map(lambda _: self.readint(), range(n)))
 	
 	
 	def _read_ack(self):
@@ -55,9 +55,9 @@ class Connection(object):
 			errno = self.readint()
 			msg = self.readline()
 			description = "FAILED " + str(errno) + " " + msg
-			print bad(description)
+			log.bad(description)
 			if errno == 6: # forced waiting
-				print bad(self.readline()) # FORCED_WAITING secs
+				log.bad(self.readline()) # FORCED_WAITING secs
 				self._read_ack()
 			raise CommandFailedError(description, errno)
 
@@ -67,7 +67,8 @@ class Connection(object):
 		result = self.readstr()
 		if not isinstance(what, list):
 			what = [what]
-		if result not in what: print warn(result)
+		if result not in what:
+			log.warn(result)
 		return result
 	
 
@@ -84,7 +85,7 @@ class Connection(object):
 		s.close()
 	
 	@misc.insist((EOFError, socket.error), 2)
-	def _connectNlogin(self):
+	def _connect_and_login(self):
 		self._connect()
 		self._login()
 
@@ -99,23 +100,25 @@ class Connection(object):
 
 	def cmd(self, *what):
 		'''sends command what, waits for OK, reads some lines'''
-		self.writeln(*what)
-		try:
-			self._read_ack()
-		except (ForcedWaitingError, ConnectionResetError):
-			self.cmd(*what)	# repeat the command
+		while 1:
+			self.writeln(*what)
+			try:
+				return self._read_ack()
+			except (ForcedWaitingError, ConnectionResetError):
+				pass	# repeat the command
 
 	def throwing_cmd(self, *what):
 		''' throws ForcedWaitingError '''
-		self.writeln(*what)
-		try:
-			self._read_ack()
-		except ConnectionResetError:
-			self.cmd(*what)	# repeat the command
+		while 1:
+			self.writeln(*what)
+			try:
+				self._read_ack()
+			except ConnectionResetError:
+				pass	# repeat the command
 
 
 	def wait(self):
 		'''waits for next turn'''
 		self.cmd_wait()
-		print info(self.readline())
+		log.info(self.readline())
 		self._read_ack()

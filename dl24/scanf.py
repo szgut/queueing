@@ -1,7 +1,7 @@
 
 def token(f):
 	whitespace, l = ' \t\n', []
-	while True:
+	while 1:
 		c = f.read(1)
 		if not c:
 			if len(l) and l[-1] not in whitespace: break
@@ -13,7 +13,7 @@ def token(f):
 
 def whole_line(f):
 	l = []
-	while True:
+	while 1:
 		c = f.read(1)
 		if not c:
 			if len(l): return ''.join(l)
@@ -30,17 +30,3 @@ def readline(f):
 		line = whole_line(f)
 		if line.split():
 			return line
-
-if __name__ == '__main__':
-	#from sys import stdin as inp
-	import socket
-	s = socket.socket()
-	s.connect(('127.0.0.1', 1234))
-	inp = s.makefile()
-	
-	n = readint(inp)
-	l = []
-	for i in range(0,n):
-		l.append(token(inp))
-	print l
-	print map(int, l)

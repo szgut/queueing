@@ -1,11 +1,14 @@
 # -*- coding: utf-8 -*-
+try:
+	import cPickle as pickle
+except ImportError:
+	import pickle
 import functools
 import signal
 import contextlib
-import cPickle as pickle
-import colors
 import time
 import heapq
+import log
 
 def insist(exception=KeyboardInterrupt, wait=None):
 	def decorator(fun):
@@ -15,7 +18,7 @@ def insist(exception=KeyboardInterrupt, wait=None):
 				try:
 					return fun(*args, **kwargs)
 				except exception:
-					print colors.bad("retrying %s...\n" % fun.__name__)
+					log.bad("retrying %s..." % fun.__name__)
 					if wait is not None:
 						time.sleep(wait)
 		return wrapper
@@ -24,7 +27,7 @@ def insist(exception=KeyboardInterrupt, wait=None):
 
 def flatten(*items):
 	for item in items:
-		if isinstance(item, basestring):
+		if isinstance(item, str):
 			yield item
 		else:
 			try:
@@ -40,11 +43,11 @@ class Serializer(object):
 
 	def load(self):
 		with open(self.path, 'rb') as f:
-			print colors.info("wczytuję...")
+			log.info("wczytuję...")
 			return pickle.load(f)
 
 	def save(self, obj, suf=""):
-		print colors.info("zapisuję...")
+		log.info("zapisuję...")
 		with open(self.path+suf, 'wb') as f:
 			pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
 
