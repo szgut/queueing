@@ -3,7 +3,8 @@ import socket
 import log
 import scanf
 import misc
-	
+
+
 class CommandFailedError(Exception):
 	def __new__(cls, msg, errno=None):
 		exceptions = {6: ForcedWaitingError}
@@ -13,7 +14,9 @@ class CommandFailedError(Exception):
 		self.errno = errno
 class ForcedWaitingError(CommandFailedError): pass
 
+
 class ConnectionResetError(Exception): pass
+
 
 # tcp
 class Connection(object):
@@ -23,16 +26,6 @@ class Connection(object):
 		self._port = port
 		self._connect_and_login()
 
-
-	def __getattr__(self, name):
-		'''cmd_STH forward to cmd() '''
-		if name.startswith("cmd_"):
-			def clo(*what):
-				return self.cmd(name[4:].upper(), *what)
-			return clo
-		else:
-			raise AttributeError(name)
-	
 	def _catch_read(self, fun):
 		try: return fun(self.f)
 		except EOFError:
@@ -81,7 +74,7 @@ class Connection(object):
 		s = socket.socket()
 		s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
 		s.connect((self._host, self._port))
-		self.f = s.makefile('rw', 1)
+		self.f = s.makefile('r+', 1)
 		s.close()
 	
 	@misc.insist((EOFError, socket.error), 2)
