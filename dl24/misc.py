@@ -57,13 +57,11 @@ def delay_sigint():
 	exc = [False]
 	def handler(signal, frame):
 		exc[0] = True
-	def default_handler(signal, frame):
-		raise KeyboardInterrupt
 	signal.signal(signal.SIGINT, handler)
 	yield
-	signal.signal(signal.SIGINT, default_handler)
+	signal.signal(signal.SIGINT, signal.default_int_handler)
 	if exc[0]:
-		raise KeyboardInterrupt
+		signal.default_int_handler()
 
 
 class sortedset(object):

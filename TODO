@@ -1,2 +1,2 @@
-* wspierać py2 i py3
-* pygame/pyglet
+* pygame/pyglet - oddzielny proces
+* logowanie sensowne
