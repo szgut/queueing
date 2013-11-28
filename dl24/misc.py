@@ -65,15 +65,17 @@ def delay_sigint():
 
 
 class sortedset(object):
-	def __init__(self, items=None, keyfun=None):
-		self._keyfun = keyfun
+	def __init__(self, items=None, keyfun=None, getmax=False):
+		self._keyfun = keyfun = keyfun or (lambda x: x)
+		if getmax:
+			self._keyfun = lambda x: -keyfun(x)
 		self._heap = []
 		self._correct_kvals = {}
 		if items is not None:
 			self.add_all(items)
 
 	def add(self, item, key=None):
-		kval = self._keyfun(item) if self._keyfun is not None else key
+		kval = key if key is not None else self._keyfun(item)
 		heapq.heappush(self._heap, (kval, item))
 		self._correct_kvals[item] = kval
 
