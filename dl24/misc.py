@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
-try:
-	import cPickle as pickle
-except ImportError:
-	import pickle
-import functools
-import signal
+import cPickle as pickle
 import contextlib
-import time
+import functools
 import heapq
-import log
+import signal
+import time
+
+from dl24 import log
+
 
 def insist(exception=KeyboardInterrupt, wait=None):
 	def decorator(fun):
@@ -102,7 +101,6 @@ class sortedset(object):
 		del self._correct_kvals[item]
 		heapq.heappop(self._heap)
 		return item
-
 
 	def __contains__(self, item):
 		return item in self._correct_kvals

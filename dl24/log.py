@@ -22,18 +22,25 @@ MAGENTABG='\033[45m'
 CYANBG  = '\033[46m'
 WHITEBG = '\033[47m'
 
+
 def color(name, string):
-    return "%s%s%s" % (name, string, RESET)
+	return "%s%s%s" % (name, string, RESET)
+
 
 pp = pprint.PrettyPrinter()
+
 def log(obj):
 	pp.pprint(obj)
 
+
 def warn(string):
-    log(color(BOLD+REDBG, string))
+	log(color(BOLD+REDBG, string))
+
 def bad(string):
-    log(color(RED, string))
+	log(color(RED, string))
+
 def good(string):
-    log(color(GREEN, string))
+	log(color(GREEN, string))
+
 def info(string):
-    log(color(YELLOW, string))
+	log(color(YELLOW, string))

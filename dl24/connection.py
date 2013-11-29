@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 import socket
-import log
-import scanf
-import misc
+
+from dl24 import log
+from dl24 import misc
+from dl24 import scanf
 
 
 class CommandFailedError(Exception):
@@ -12,13 +13,16 @@ class CommandFailedError(Exception):
 	def __init__(self, msg, errno=None):
 		super(CommandFailedError, self).__init__(msg)
 		self.errno = errno
-class ForcedWaitingError(CommandFailedError): pass
 
 
-class ConnectionResetError(Exception): pass
+class ForcedWaitingError(CommandFailedError):
+	pass
 
 
-# tcp
+class ConnectionResetError(Exception):
+	pass
+
+
 class Connection(object):
 		
 	def __init__(self, host='localhost', port=20003):
@@ -40,7 +44,6 @@ class Connection(object):
 	def readints(self, n):
 		return list(map(lambda _: self.readint(), range(n)))
 	
-	
 	def _read_ack(self):
 		'''waits for OK'''
 		result = self._readstr_assert(['OK', 'FAILED'])
@@ -54,7 +57,6 @@ class Connection(object):
 				self._read_ack()
 			raise CommandFailedError(description, errno)
 
-
 	def _readstr_assert(self, what):
 		'''read token and make sure is in list what or equals string what'''
 		result = self.readstr()
@@ -63,11 +65,9 @@ class Connection(object):
 		if result not in what:
 			log.warn(result)
 		return result
-	
 
 	def writeln(self, *what):
 		self.write(" ".join(map(str, misc.flatten(what))) +"\n")
-
 	
 	def _connect(self):
 		'''connect to server'''
@@ -77,11 +77,10 @@ class Connection(object):
 		self.f = s.makefile('r+', 1)
 		s.close()
 	
-	@misc.insist((EOFError, socket.error), 2)
+	@misc.insist((EOFError, socket.error), wait=2)
 	def _connect_and_login(self):
 		self._connect()
 		self._login()
-
 
 	def _login(self, name="team9", password="emefbvvxle"):
 		'''login to server'''
@@ -89,7 +88,6 @@ class Connection(object):
 		self.writeln(name)
 		self._readstr_assert('PASS')
 		self.cmd(password)
-	
 
 	def cmd(self, *what):
 		'''sends command what, waits for OK, reads some lines'''
@@ -108,7 +106,6 @@ class Connection(object):
 				self._read_ack()
 			except ConnectionResetError:
 				pass	# repeat the command
-
 
 	def wait(self):
 		'''waits for next turn'''
