@@ -1,5 +1,3 @@
-import pprint
-
 BLACK   = '\033[30m'
 RED     = '\033[31m'
 GREEN   = '\033[32m'
@@ -26,11 +24,8 @@ WHITEBG = '\033[47m'
 def color(name, string):
 	return "%s%s%s" % (name, string, RESET)
 
-
-pp = pprint.PrettyPrinter()
-
 def log(obj):
-	pp.pprint(obj)
+	print obj
 
 
 def warn(string):

@@ -1,11 +1,12 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
-import dl24.connection
-from dl24.misc import Serializer
-from dl24.misc import delay_sigint
-from dl24.colors import warn, bad, good, info
 import argparse
 import traceback
+
+from dl24 import connection
+from dl24 import log
+from dl24 import misc
+
 
 class Config(object):
 	def __init__(self, universum=1):
@@ -13,55 +14,59 @@ class Config(object):
 		self.datafile = 'data'
 		self.port = 20000+universum-1
 
-class Connection(dl24.connection.Connection):
+
+class Connection(connection.Connection):
 	# implementacja komend z zadania
 	def dupa(self):
-		self.cmd_dupa(3, [4, 5])
+		self.cmd("dupa", 3, [4, 5])
 		return self.readints(2)
 
 
 def parse_args():
 	parser = argparse.ArgumentParser()
-	parser.add_argument("-U", "--universum", metavar="N", type=int, 
+	parser.add_argument("-u", "--universum", metavar="N", type=int, 
 		help="universum number", default=1)
-	parser.add_argument("-D", "--dontload", action='store_false', 
+	parser.add_argument("-d", "--dontload", action='store_false', 
 		help="do not load initial state from dump file", dest='loadstate')
+	parser.add_argument('posargs', nargs='?', default=[])
 	return parser.parse_args()
 
+
+class PersistentState(object):
+	def __init__(self):
+		self.a = 0
+
+
 def init_state(read):
-	global global_sth
+	global gs
 	if read:
-		global_sth = serializer.load()
+		gs = serializer.load()
 	else:
-		global_sth = 0
+		gs = PersistentState()
 
 
-zmienna_statyczna = [1]
 def loop():
-	# ~import time
-	# ~print "."
-	zmienna_statyczna[0] += 1
-	conn.cmd_dupa(zmienna_statyczna[0])
-	# ~time.sleep(3)
+	conn.dupa()
 
 
 if __name__ == '__main__':
 	args = parse_args()
+	print args.posargs
 	config = Config(args.universum)
-	serializer = Serializer(config.datafile)
+	serializer = misc.Serializer(config.datafile)
 	conn = Connection(config.host, config.port)
-	print info("logged in")
+	log.info("logged in")
 
 	init_state(args.loadstate)
-	global_sth += 1
-	print global_sth
+	gs.a += 1
+	print gs.a
 	
 	try: # main loop
 		while 1:
 			loop()
 			conn.wait()
 	except KeyboardInterrupt:
-		serializer.save(global_sth)
+		serializer.save(gs)
 	except:
 		traceback.print_exc()
-		serializer.save(global_sth, ".crash")
+		serializer.save(gs, ".crash")

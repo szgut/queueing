@@ -67,7 +67,7 @@ class Connection(object):
 		return result
 
 	def writeln(self, *what):
-		self.write(" ".join(map(str, misc.flatten(what))) +"\n")
+		self.f.write(" ".join(map(str, misc.flatten(what))) +"\n")
 	
 	def _connect(self):
 		'''connect to server'''
