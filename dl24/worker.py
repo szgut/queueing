@@ -1,70 +1,76 @@
 import contextlib
-import pickle
+import json
 import Queue
 import socket
 import threading
 
+from dl24 import scanf
+from dl24 import slottedstruct
+from dl24 import log
+
+
+class Point(slottedstruct.SlottedStruct):
+	__slots__ = ('x', 'y')
+
+
+class Click(slottedstruct.SlottedStruct):
+	__slots__ = ('point', 'tidlist')
+
 
 class Worker(threading.Thread):
 
-	def __init__(self, port, host='localhost', autostart=True):  # main thread
+	def __init__(self, host='localhost', port=1234, autostart=True):
 		super(Worker, self).__init__()
 		self.daemon = True
-		self.queue = Queue.Queue()
-		self._server_socket = None
-		self._pickler = None
-		self._unpickler = None
-		self._listen(host, port)
+		self._queue = Queue.Queue()
+		self._connect(host, port)
 		if autostart:
 			self.start()
 
-	def _listen(self, host, port):  # main thread
-		self._server_socket = s = socket.socket()
-		s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-		s.bind((host, port))
-		s.listen(0)
+	def _connect(self, host, port):
+		sock = socket.socket()
+		sock.connect((host, port))
+		with contextlib.closing(sock):
+			self.cfile = sock.makefile('r+', 0)
 
-	def _connect_client(self):  # worker thread
-		client_socket, _addr = self._server_socket.accept()
-		print _addr
-		with contextlib.closing(client_socket.makefile('r+b', 0)) as _file:
-			self._pickler = pickle.Pickler(_file, pickle.HIGHEST_PROTOCOL)
-			self._unpickler = pickle.Unpickler(_file)
-
-	def _handle_reads(self):  # worker thread
-		while True:
-			obj = self._unpickler.load()
-			self.queue.put_nowait(obj)
-
-	def run(self):  # worker thread
-		while True:
-			self._connect_client()
-			try:
-				self._handle_reads()
-			except EOFError:
-				pass
-
-	def iterget(self):  # main thread
-		while True:
-			try:
-				yield self.queue.get_nowait()
-			except Queue.Empty:
-				break
-
-	def put(self, obj):  # main thread
+	def handle_line(self, line):
 		try:
-			self._pickler.dump(obj)
+			obj = json.loads(line)
+			click = Click(Point(*obj[0]), obj[1])
+		except (ValueError, IndexError) as e:
+			log.warn(e)
+		self._queue.put(click)
+
+	def run(self):
+		try:
+			while True:
+				line = self.cfile.readline()
+				if not line: break
+				self.handle_line(line)
+		except IOError:
+			log.warn('gui connection closed')
+
+	def iterget(self):
+		try:
+			while True:
+				yield self._queue.get_nowait()
+		except Queue.Empty:
+			pass
+
+	def command(self, **kwargs):
+		try:
+			print>>self.cfile, json.dumps(kwargs)
 			return True
-		except (AttributeError, socket.error):
+		except (IOError, socket.error):
 			return False
 
 
 if __name__ == '__main__':
-	import readline
-	w = Worker(1234)
-	while 1:
-		obj = input('> ')
-		if obj:
-			print w.put(obj)
-		else:
-			print list(w.iterget())
+	w = Worker()
+	w.command(tid=123, points=[(1,2), (2,3), (3,4)])
+	try:
+		while True:
+			print w._queue.get()
+	except KeyboardInterrupt:
+		print "dupa"
+	
