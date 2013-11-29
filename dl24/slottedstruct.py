@@ -1,4 +1,3 @@
-#!/usr/bin/env python2
 
 class SlottedStruct(object):
 	__slots__ = ()
@@ -8,7 +7,9 @@ class SlottedStruct(object):
 			setattr(self, name, arg)
 
 	def __getattr__(self, name):
-		return None
+		if name in self.__slots__:
+			return None
+		raise AttributeError(name)
 
 	def __iter__(self):
 		for name in self.__slots__:
@@ -46,6 +47,7 @@ if __name__ == '__main__':
 	print (Ifka(12, y="dupa"))
 	print (list(Ifka(1)))
 	print (str(Ifka()))
+	print Ifka().x
 
 	a = Ifka(1,2)
 	b = Ifka(2,3)

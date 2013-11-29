@@ -4,7 +4,6 @@ import Queue
 import socket
 import threading
 
-from dl24 import scanf
 from dl24 import slottedstruct
 from dl24 import log
 
@@ -31,7 +30,7 @@ class Worker(threading.Thread):
 		sock = socket.socket()
 		sock.connect((host, port))
 		with contextlib.closing(sock):
-			self.cfile = sock.makefile('r+', 0)
+			self.cfile = sock.makefile('r+', 1)
 
 	def handle_line(self, line):
 		try:
@@ -42,6 +41,7 @@ class Worker(threading.Thread):
 		self._queue.put(click)
 
 	def run(self):
+		print "running"
 		try:
 			while True:
 				line = self.cfile.readline()
@@ -68,9 +68,7 @@ class Worker(threading.Thread):
 if __name__ == '__main__':
 	w = Worker()
 	w.command(tid=123, points=[(1,2), (2,3), (3,4)])
-	try:
-		while True:
-			print w._queue.get()
-	except KeyboardInterrupt:
-		print "dupa"
+	while True:
+		for elem in w.iterget():
+			print elem
 	
