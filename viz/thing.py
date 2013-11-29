@@ -1,4 +1,5 @@
 from dl24.misc import sortedset
+import pygame
 
 class Thing(object):
 	def __init__(self, points, label='', color=(0,0,255)):
@@ -20,16 +21,19 @@ class Thing(object):
 
 
 class Command(object):
-	def __init__(self, action='add', tid=0, points=None, label='', color=(0,255,0), **kwargs):
+	def __init__(self, action='add', tid=0, points=None, label='', color=(0,255,0), title='', **kwargs):
 		self.thing = Thing(points or [], label, color)
 		self.action = action
 		self.tid = tid
+		self.title = title
 	
 	def __call__(self, thingsset):
 		if self.action == 'add':
 			thingsset.add(self.tid, self.thing)
 		elif self.action == 'remove':
 			thingsset.remove(self.tid)
+		elif self.action == 'set_title':
+			pygame.display.set_caption(self.title)
 
 
 class ThingsSet(object):
