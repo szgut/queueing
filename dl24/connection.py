@@ -110,6 +110,6 @@ class Connection(object):
 
 	def wait(self):
 		'''waits for next turn'''
-		self.cmd_wait()
+		self.cmd('WAIT')
 		log.info(self.readline())
 		self._read_ack()
