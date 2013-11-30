@@ -45,17 +45,18 @@ class Gui(object):
 class Viz(Gui):
 	shapes = [
 		[], # 
-		[((0,3),(3,6))], # 1
-		[((0,3),(3,6)), ((3,0),(3,2)), ((3,4),(3,6))], # 2
+		[((0,3),(6,3))], # 1
+		[((0,3),(6,3)), ((3,0),(3,2)), ((3,4),(3,6))], # 2
 		[((3,0),(3,1)), ((3,1),(1,3)), ((1,3),(0,3))], # 3
 		[((3,0),(3,1)), ((3,1),(1,3)), ((1,3),(0,3)),
 		 ((3,6),(3,5)), ((3,5),(5,3)), ((5,3),(6,3))], # 4
-		[((0,3),(3,6)), ((3,0),(3,3))], # 5
-		[((0,3),(3,6)), ((3,0),(3,6))], # 6
+		[((0,3),(6,3)), ((3,0),(3,3))], # 5
+		[((0,3),(6,3)), ((3,0),(3,6))], # 6
 		[((0,3),(3,3))], # 6
 	]
-
-	def rotPoint(pkt, count):
+	
+	@staticmethod
+	def rotPoint(pkt, count, pxlen):
 		x, y = pkt
 		x -= 3
 		y -= 3
@@ -63,6 +64,10 @@ class Viz(Gui):
 			x, y = -y, x
 		x += 3
 		y += 3
+		x *= pxlen
+		x /= 6
+		y *= pxlen
+		y /= 6
 		return (x, y)
 		
 	
@@ -105,10 +110,11 @@ class Viz(Gui):
 				if thing.typ == None:
 					pygame.draw.rect(screen, thing.color, self.square(point, pxlen))
 				else:
-					for (p1, p2) in shapes[thing.typ]:
-						(orx, ory) = self.square(point, pxlen)
-						(p1x, p1y) = rotPoint(p1, thing.rot) * pxlen / 6
-						(p2x, p2y) = rotPoint(p2, thing.rot) * pxlen / 6
+					for (p1, p2) in self.shapes[thing.typ]:
+						(orx, ory) = point
+						(orx, ory) = (orx * pxlen, ory * pxlen)
+						(p1x, p1y) = self.rotPoint(p1, thing.rot, pxlen)
+						(p2x, p2y) = self.rotPoint(p2, thing.rot, pxlen)
 						p1 = (orx + p1x, ory + p1y)
 						p2 = (orx + p2x, ory + p2y)
 						pygame.draw.line(screen, thing.color, p1, p2)

@@ -51,7 +51,7 @@ class ThingsSet(object):
 	
 	def add(self, tid, thing):
 		if thing.typ is not None:
-			reversed = True
+			self.reversed = True
 		if tid in self._things:
 			self._remove_old_points(self._things[tid])
 		self._things[tid] = thing
