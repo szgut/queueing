@@ -18,11 +18,13 @@ class Click(slottedstruct.SlottedStruct):
 
 class Worker(threading.Thread):
 
-	def __init__(self, host='localhost', port=1234, autostart=True):
+	def __init__(self, host='localhost', port=1234, autostart=True, title=None):
 		super(Worker, self).__init__()
 		self.daemon = True
 		self._queue = Queue.Queue()
 		self._connect(host, port)
+		if title is not None:
+			self.command(action='set_title', title=title)
 		if autostart:
 			self.start()
 
@@ -66,8 +68,8 @@ class Worker(threading.Thread):
 
 
 if __name__ == '__main__':
-	w = Worker()
-	w.command(tid=123, points=[(1,2), (2,3), (3,4)])
+	w = Worker(title='Muminki')
+	w.command(tid=(6,"bla"), points=[(1,2), (2,3), (3,4)], label='siedę')
 	while True:
 		for elem in w.iterget():
 			print elem

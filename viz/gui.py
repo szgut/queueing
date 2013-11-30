@@ -26,7 +26,6 @@ class Gui(object):
 		
 	def loop(self):
 		self._set_screen_size(self._size)
-		pygame.display.set_caption('tapatiki')
 		while True:
 			pygame.event.pump()
 			self._handle_event(pygame.event.wait())
@@ -34,8 +33,8 @@ class Gui(object):
 			pygame.display.flip()
 
 	def _handle_event(self, event):
-		#if event.type == pygame.QUIT:
-		#	raise StopGui
+		if event.type == pygame.QUIT:
+			raise StopGui
 		if event.type == pygame.VIDEORESIZE:
 			self._set_screen_size(event.size)
 		elif event.type == pygame.MOUSEBUTTONUP:
@@ -52,8 +51,8 @@ class Viz(Gui):
 		self.callback = callback
 		
 		self.things = thing.ThingsSet()
-		self.things.add(1, thing.Thing([(0,0), (2,0)], label=u"cos"))
-		self.things.add(2, thing.Thing([(1,1), (0,0)], color=(255,0,0), label="trzy"))
+		#self.things.add(1, thing.Thing([(0,0), (2,0)], label=u"cos"))
+		#self.things.add(2, thing.Thing([(1,1), (0,0)], color=(255,0,0), label="trzy"))
 			
 	def handle_click(self, pos, button):
 		pxlen = self.comp_pxlen()
@@ -93,5 +92,5 @@ def main(clicks_callback=lambda x: None):
 	pygame.init()
 	try:
 		Viz(clicks_callback, (320, 240)).loop()
-	except KeyboardInterrupt:
+	except (KeyboardInterrupt, StopGui):
 		pass

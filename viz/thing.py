@@ -24,8 +24,10 @@ class Command(object):
 	def __init__(self, action='add', tid=0, points=None, label='', color=(0,255,0), title='', **kwargs):
 		self.thing = Thing(points or [], label, color)
 		self.action = action
-		self.tid = tid
 		self.title = title
+		if isinstance(tid, list):
+			tid = tuple(tid)
+		self.tid = tid
 	
 	def __call__(self, thingsset):
 		if self.action == 'add':
