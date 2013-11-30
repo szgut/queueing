@@ -239,9 +239,12 @@ def recruit():
 			if layer == 1:
 				edge.append(point)
 		point = random.Random().choice(edge)
-	conn.recruit_soldiers(point, money)
-	sol_count[point] += money
-	print "recruited %d at %s" % (money, point)
+	try:
+		conn.recruit_soldiers(point, money)
+		sol_count[point] += money
+		print "recruited %d at %s" % (money, point)
+	except connection.CommandFailedError as e:
+		log.warn(e)
 	
 
 def choose_target(point, my_bonuses):
