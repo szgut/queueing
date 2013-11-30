@@ -9,7 +9,11 @@ from dl24 import scanf
 
 class CommandFailedError(Exception):
 	def __new__(cls, msg, errno=None):
-		exceptions = {6: ForcedWaitingError, 9: NoCurrentWorld}
+		exceptions = {
+					6: ForcedWaitingError,
+					7: ForcedWaitingError,
+					9: NoCurrentWorld
+				}
 		return super(CommandFailedError, cls).__new__(exceptions.get(errno, cls))
 	def __init__(self, msg, errno=None):
 		super(CommandFailedError, self).__init__(msg)
