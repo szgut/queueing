@@ -2,11 +2,14 @@ from dl24.misc import sortedset
 import pygame
 
 class Thing(object):
-	def __init__(self, points, label='', color=(0,0,255)):
+	def __init__(self, points, label='', color=(0,0,255), typ=None, rot=0, **kwargs):
 		self.points = map(tuple, points)
 		self.label = label
 		self.color = color
 		self.center = self._mass_center()
+		self.typ = typ
+		if typ == -1: self.typ = None
+		self.rot = rot
 	
 	def _mass_center(self):
 		if not self.points: return (0,0)
@@ -22,7 +25,7 @@ class Thing(object):
 
 class Command(object):
 	def __init__(self, action='add', tid=0, points=None, label='', color=(0,255,0), title='', **kwargs):
-		self.thing = Thing(points or [], label, color)
+		self.thing = Thing(points or [], label, color, **kwargs)
 		self.action = action
 		self.tid = tid
 		self.title = title
@@ -37,12 +40,16 @@ class Command(object):
 
 
 class ThingsSet(object):
+	reversed = False
+	
 	def __init__(self):
 		self._things = {}
 		self._heap_x = sortedset([0], getmax=True)
 		self._heap_y = sortedset([0], getmax=True)
 	
 	def add(self, tid, thing):
+		if thing.typ is not None:
+			reversed = True
 		if tid in self._things:
 			self._remove_old_points(self._things[tid])
 		self._things[tid] = thing
@@ -60,7 +67,10 @@ class ThingsSet(object):
 			self._heap_y.remove(y)		
 	
 	def reverse(self, point):
-		return (point[0], self._heap_y.top() - point[1])
+		if not reversed:
+			return (point[0], self._heap_y.top() - point[1])
+		else:
+			return point
 	
 	def tids_at(self, point):
 		for tid, thing in self._things.iteritems():
