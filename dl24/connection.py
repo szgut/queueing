@@ -82,7 +82,7 @@ class Connection(object):
 		self._connect()
 		self._login()
 
-	def _login(self, name="team9", password="emefbvvxle"):
+	def _login(self, name="team08", password="pqe8g44u4x"):
 		'''login to server'''
 		self._readstr_assert('LOGIN')
 		self.writeln(name)
