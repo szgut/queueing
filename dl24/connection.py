@@ -46,13 +46,14 @@ class Connection(object):
 	
 	def _read_ack(self):
 		'''waits for OK'''
-		result = self._readstr_assert(['OK', 'FAILED'])
-		if result == 'FAILED':
+		OK, FAILED = 'OK', 'ERROR'
+		result = self._readstr_assert([OK, FAILED])
+		if result == FAILED:
 			errno = self.readint()
 			msg = self.readline()
 			description = "FAILED " + str(errno) + " " + msg
 			log.bad(description)
-			if errno == 6: # forced waiting
+			if errno == 7: # forced waiting
 				log.bad(self.readline()) # FORCED_WAITING secs
 				self._read_ack()
 			raise CommandFailedError(description, errno)
@@ -86,7 +87,7 @@ class Connection(object):
 		'''login to server'''
 		self._readstr_assert('LOGIN')
 		self.writeln(name)
-		self._readstr_assert('PASS')
+		self._readstr_assert('PASSWORD')
 		self.cmd(password)
 
 	def cmd(self, *what):
@@ -109,6 +110,6 @@ class Connection(object):
 
 	def wait(self):
 		'''waits for next turn'''
-		self.cmd_wait()
+		self.cmd('WAIT')
 		log.info(self.readline())
 		self._read_ack()
