@@ -68,9 +68,9 @@ class Connection(multiprocessing.Process):
 		if isinstance(obj, dict):
 			gui.schedule(lambda gui: thing.Command(**obj)(gui.things))
 	
-	def clicked_callback(self, point, tids):
+	def clicked_callback(self, point, tids, button):
 		try:
-			print>>self.cfile, json.dumps((point, tids))
+			print>>self.cfile, json.dumps((point, tids, button))
 		except IOError as e:
 			print e
 	

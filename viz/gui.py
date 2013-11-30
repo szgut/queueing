@@ -92,7 +92,7 @@ class Viz(Gui):
 		rpoint = self.things.reverse((pos[0]/pxlen, pos[1]/pxlen))
 		tids = list(self.things.tids_at(rpoint))
 		print rpoint, tids
-		self.callback(rpoint, tids)	
+		self.callback(rpoint, tids, button)	
 	
 	@staticmethod
 	def square(point, pxlen):

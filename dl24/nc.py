@@ -21,8 +21,13 @@ def main(host, sport):
 	conn = connection.Connection(host, int(sport))
 	Reader(conn).start()
 	try:
-		while True:
-			conn.writeln(raw_input().upper())
+		if  sport < 7021 or sport > 7022:
+			while True:
+				conn.writeln(raw_input().upper())
+			else
+				ipu = raw_input()
+				if ipu[:4] == "WAIT":
+					
 	except (EOFError, KeyboardInterrupt):
 		pass
 
