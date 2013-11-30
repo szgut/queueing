@@ -28,7 +28,8 @@ class Gui(object):
 		self._set_screen_size(self._size)
 		while True:
 			pygame.event.pump()
-			self._handle_event(pygame.event.wait())
+			for event in pygame.event.get():
+				self._handle_event(event)
 			self.render(self._screen)
 			pygame.display.flip()
 
