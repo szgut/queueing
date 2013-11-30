@@ -83,7 +83,8 @@ class Viz(Gui):
 		for thing in self.things:
 			for point in self.things.points(thing):
 				pygame.draw.rect(screen, thing.color, self.square(point, pxlen))
-				
+		
+		for thing in self.things:
 			label = myfont.render(thing.label, 1, (255,255,0))
 			screen.blit(label, self.center(thing.center, pxlen))		
 

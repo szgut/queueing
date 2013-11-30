@@ -1,4 +1,4 @@
-from dl24.misc import sortedset
+#from dl24.misc import sortedset
 import pygame
 
 class Thing(object):
@@ -41,28 +41,28 @@ class Command(object):
 class ThingsSet(object):
 	def __init__(self):
 		self._things = {}
-		self._heap_x = sortedset([0], getmax=True)
-		self._heap_y = sortedset([0], getmax=True)
+		#self._heap_x = sortedset([0], getmax=True)
+		#self._heap_y = sortedset([0], getmax=True)
 	
 	def add(self, tid, thing):
-		if tid in self._things:
-			self._remove_old_points(self._things[tid])
+		#if tid in self._things:
+		#	self._remove_old_points(self._things[tid])
 		self._things[tid] = thing
-		for x, y in thing.points:
-			self._heap_x.add(x)
-			self._heap_y.add(y)
+		#for x, y in thing.points:
+		#	self._heap_x.add(x)
+		#	self._heap_y.add(y)
 	
 	def remove(self, tid):
 		self._remove_old_points(self._things[tid])
 		del self._things[tid]
 	
-	def _remove_old_points(self, thing):
-		for x, y in thing.points:
-			self._heap_x.remove(x)
-			self._heap_y.remove(y)		
+	#def _remove_old_points(self, thing):
+	#	for x, y in thing.points:
+	#		self._heap_x.remove(x)
+	#		self._heap_y.remove(y)		
 	
 	def reverse(self, point):
-		return (point[0], self._heap_y.top() - point[1])
+		return (point[0], self.size[1] - point[1])
 	
 	def tids_at(self, point):
 		for tid, thing in self._things.iteritems():
@@ -75,7 +75,13 @@ class ThingsSet(object):
 	
 	@property
 	def size(self):
-		return self._heap_x.top(), self._heap_y.top()
+		#return self._heap_x.top(), self._heap_y.top()
+		maxx, maxy = 0, 0
+		for thing in self:
+			for point in thing.points:
+				maxx = max(maxx, point[0])
+				maxy = max(maxy, point[1])
+		return (maxx, maxy)
 	
 	def __iter__(self):
 		return self._things.itervalues()

@@ -5,6 +5,8 @@ import socket
 import sys
 import threading
 
+import pygame
+
 import gui
 import thing
 
@@ -57,12 +59,12 @@ class Connection(multiprocessing.Process):
 		sys.stdin.close()
 		self.cfile = self.sock.makefile('r+', 1)
 		
+		pygame.init()
 		daemon_run(self.read_socket_lines)
 		gui.main(self.clicked_callback)
 		print 'gui closed'
 	
 	def handle_input(self, obj):
-		print obj
 		if isinstance(obj, dict):
 			gui.schedule(lambda gui: thing.Command(**obj)(gui.things))
 	
