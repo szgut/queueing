@@ -24,7 +24,7 @@ def main(host, sport):
 		if  sport < 7021 or sport > 7022:
 			while True:
 				conn.writeln(raw_input().upper())
-			else
+			else:
 				ipu = raw_input()
 				if ipu[:4] == "WAIT":
 					
