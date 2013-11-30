@@ -1,21 +1,28 @@
 #!/usr/bin/env python
 import readline
 import sys
+import threading
 
 from dl24 import connection
 
 
+class Reader(threading.Thread):
+	def __init__(self, conn):
+		super(Reader, self).__init__()
+		self.daemon = True
+		self.conn = conn
+	
+	def run(self):
+		while True:
+			print self.conn.readline()
+
+
 def main(host, sport):
 	conn = connection.Connection(host, int(sport))
+	Reader(conn).start()
 	try:
 		while True:
-			line = raw_input('> ')
-			if line:
-				conn.cmd(line.upper())
-			try:
-				print conn.readline()
-			except KeyboardInterrupt:
-				pass
+			conn.writeln(raw_input().upper())
 	except (EOFError, KeyboardInterrupt):
 		pass
 
