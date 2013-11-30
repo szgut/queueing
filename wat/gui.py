@@ -79,12 +79,12 @@ class Gui(threading.Thread):
 		col = (255, 0, 255)
 		for (x, y), cid in conn.my_contracts.items():
 			col = (0, 255, 0)
-			self.w.command(tid=1000000+i, points=[(x, y)], color=col)
+			self.w.command(tid=-1000000+i, points=[(x, y)], color=col)
 			i += 1
 
 		col = (255, 0, 0)
 		for (x, y), rot in conn.sources.items():
-			self.w.command(tid=1000000+i, points=[(x, y)], typ=7, rot=rot, color=col)
+			self.w.command(tid=-1000000+i, points=[(x, y)], typ=7, rot=rot, color=col)
 			i += 1
 
 		self.update_command_window(conn)
