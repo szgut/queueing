@@ -60,8 +60,11 @@ class ThingsSet(object):
 		#	self._heap_y.add(y)
 	
 	def remove(self, tid):
-		self._remove_old_points(self._things[tid])
-		del self._things[tid]
+		#self._remove_old_points(self._things[tid])
+		try:
+			del self._things[tid]
+		except KeyError:
+			pass
 	
 	#def _remove_old_points(self, thing):
 	#	for x, y in thing.points:
