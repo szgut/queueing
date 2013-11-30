@@ -1,3 +1,5 @@
+import time
+
 import pygame.event
 import thing
 
@@ -28,10 +30,15 @@ class Gui(object):
 		self._set_screen_size(self._size)
 		while True:
 			pygame.event.pump()
-			for event in pygame.event.get():
-				self._handle_event(event)
-			self.render(self._screen)
-			pygame.display.flip()
+			events = list(pygame.event.get())
+			if events:
+				for event in events:
+					self._handle_event(event)
+				self.render(self._screen)
+				pygame.display.flip()
+			else:
+				time.sleep(0.1)
+			
 
 	def _handle_event(self, event):
 		if event.type == pygame.QUIT:
