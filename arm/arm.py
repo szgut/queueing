@@ -3,6 +3,7 @@
 import argparse
 import collections
 import traceback
+import time
 import threading
 import random
 
@@ -72,6 +73,19 @@ class Connection(connection.Connection):
 		self.cmd('SHOW_BONUS', i)
 		k = self.readint()
 		return map(lambda *x: Point(*self.readints(2)), xrange(k))
+	
+	def get_field(self, point):
+		self.cmd('GET_FIELD', point.x, point.y)
+		k = self.readint()
+		divisions = []
+		for _ in xrange(k):
+			divisions.append(Division(Point(*self.readints(2)), self.readint()))
+			self.readint()
+		return divisions
+	
+#	def get_turn_result(self):
+#		self.cmd('GET_TURN_RESULT')
+		
 
 
 def parse_args():
@@ -147,39 +161,46 @@ class WorldMap(object):
 
 	def good_bonuses(self):
 		my = self.my_bonuses()
-		good = []
+		good = set()
 		for i in my:
 			if self._taken_bonus(self.bonuses[i-1]):
-				good.append(i)
+				good.add(i)
 		return good
 
 
 def init_state(read=False):
-	global world_map, round_no, sol_count, layer_map
+	global world_map, round_no, clusters
 	if read:
 		world_map, round_no = serializer.load()
 	else:
 		N, _, _ = conn.descrie_world()
 		world_map = WorldMap(N)
 		round_no, _, _ = conn.get_time()
-	sol_count = collections.defaultdict(int)
-	layer_map = collections.defaultdict(int)
+	clusters = []
 
 
 class Clicker(threading.Thread):
 	
-	target = None
-	
 	def __init__(self):
 		super(Clicker, self).__init__()
 		self.daemon = True
+		self._conn = Connection(config.host, config.port)
 	
 	def run(self):
 		while True:
 			for click in worker.iterget():
 				point = Point(*click.point)
-				log.good("%s at %s, %d" % (sol_count[point], point, layer_map[point]))
-				Clicker.target = point
+				log.good("%s at %s, %d, bonus %d" % (sol_count[point], point, layer_map[point], world_map.bonus_map[point]))
+				for neigh in point.neighs():
+					if not sol_count[neigh]: continue
+					divisions = self._conn.get_field(neigh)
+					for div in divisions:
+						if div.point == point:
+							log.good(div)
+					break
+				
+				
+			time.sleep(0.1)
 
 def read_time():
 	global round_no
@@ -190,7 +211,7 @@ def read_time():
 		init_state()
 
 
-def clustering(divisions, sol_count):
+def clustering(divisions):
 	clusters = []
 	visited = set()
 	
@@ -210,11 +231,16 @@ def clustering(divisions, sol_count):
 	return clusters
 
 
-def layerize(cluster, sol_count, layer_map):
+def layerize(cluster, my_bonuses, good_bonuses):
+	contention = (len(my_bonuses) == 3 and len(good_bonuses) == 3)
+	def is_taken(point):
+		if not contention: return sol_count[neigh]
+		return sol_count[neigh] or world_map.bonus_map[neigh]
+	
 	que = collections.deque()
 	for point in cluster:
 		for neigh in point.neighs():
-			if not world_map.is_swamp(neigh) and not sol_count[neigh]:
+			if not world_map.is_swamp(neigh) and not is_taken(neigh):
 				que.append(point)
 				layer_map[point] = 1
 				break
@@ -226,72 +252,91 @@ def layerize(cluster, sol_count, layer_map):
 				layer_map[neigh] = clayer + 1
 				que.append(neigh)
 
-def recruit():
+def target_on_edge(bonus):
+	for enemy in bonus:
+		if sol_count[enemy]: continue
+		for me in enemy.neighs():
+			if sol_count[me]:
+				return me
+
+def recruit(my_bonuses, good_bonuses):
 	money = conn.money()
 	print 'money: %d' % money
 	
-	target = Clicker.target
-	if target is not None and sol_count[target]:
-		point = target
+	to_conquer = my_bonuses.difference(good_bonuses)
+	if to_conquer and len(my_bonuses) <= 3:
+		bonus_id = list(to_conquer)[0]
+		print 'conquering %d!' % bonus_id
+		point = target_on_edge(world_map.bonuses[bonus_id-1])
 	else:
+		
+		
 		edge = []
 		for point, layer in layer_map.iteritems():
 			if layer == 1:
 				edge.append(point)
 		point = random.Random().choice(edge)
+
 	try:
+		print "recruiting %d at %s" % (money, point)
 		conn.recruit_soldiers(point, money)
 		sol_count[point] += money
-		print "recruited %d at %s" % (money, point)
 	except connection.CommandFailedError as e:
 		log.warn(e)
+		
+	worker.command(tid=1000, points=[tuple(point)], color=(255,255,0))
 	
 
-def choose_target(point, my_bonuses):
+def choose_target(point, my_bonuses, potential_bonuses):
 	neighs = []
 	for neigh in point.neighs():
-		if layer_map[neigh] < layer_map[point] and not world_map.is_swamp(neigh):
+		if not world_map.is_swamp(neigh):
 			neighs.append(neigh)
 	random.Random().shuffle(neighs)
 	
 	if len(my_bonuses) <= 3:
 		for neigh in neighs:
-			if world_map.bonus_map[neigh] in my_bonuses:
+			if world_map.bonus_map[neigh] in my_bonuses and not sol_count[neigh]:
 				return neigh # defend!
+
 		if len(my_bonuses) < 3:
 			for neigh in neighs:
-				if world_map.bonus_map[neigh]:
+				if world_map.bonus_map[neigh] and not sol_count[neigh]:
 					return neigh # attack!
+				
 		for neigh in neighs:
-			if not world_map.bonus_map[neigh]:
+			if layer_map[neigh] < layer_map[point]:
 				return neigh
 	else:
 		for neigh in neighs:
-			if not world_map.bonus_map[neigh]:
-				return neigh # leave!
+			if not world_map.bonus_map[neigh] and layer_map[neigh] < layer_map[point]:
+				return neigh # leave all!
 	return None
 	
 
 def loop():
-	global sol_count, layer_map
+	global sol_count, layer_map, clusters
 	read_time()
+	old_cluster_len = len(clusters)
 	
-	
+	# update sol_count
 	divisions = conn.divisions()
-	
-	# update sol_count	
-	
+	sol_count = collections.defaultdict(int)
 	for div in divisions:
 		sol_count[div.point] = div.n
 	
 	# compute clusters
-	clusters = clustering(divisions, sol_count)
+	clusters = clustering(divisions)
+	
+	my_bonuses = world_map.my_bonuses()
+	good_bonuses = world_map.good_bonuses()
+	
 	# layerize
-	
+	layer_map = collections.defaultdict(int)
 	for cluster in clusters:
-		layerize(cluster, sol_count, layer_map)
+		layerize(cluster, my_bonuses, good_bonuses)
 	
-	recruit()
+	recruit(my_bonuses, good_bonuses)
 	
 	# draw
 	for i, cluster in enumerate(clusters):
@@ -301,8 +346,9 @@ def loop():
 			strength += sol_count[point]
 			points.append(tuple(point))
 		worker.command(tid=i, points=points, label=str(strength))
-	for j in xrange(i+1, 40):
-		worker.command(action='remove', tid=j)	
+	for j in xrange(i+1, old_cluster_len):
+		worker.command(tid=j, action='remove')
+		
 
 	world_map.draw_swamps()
 	world_map.draw_bonuses()
@@ -311,22 +357,39 @@ def loop():
 	orders_count = 0
 	permdiv = sorted(divisions, key=lambda div: div.n, reverse=True)
 #	print permdiv[:5]
-	my_bonuses = world_map.my_bonuses()
+	potential_bonuses = set(my_bonuses)
+	
+	moves_from = []
 	for div in permdiv:
 		if orders_count == 5: break
 		if div.n == 1: break
 		try:
 			point = div.point	
-			dest = choose_target(point, my_bonuses)
+			dest = choose_target(point, my_bonuses, potential_bonuses)
 			if dest is not None:
-				conn.move(point, dest, div.n, 1)
-				print "moving from", point, layer_map[point], "to", dest, layer_map[dest], "strength", div.n
+				if not sol_count[dest] and world_map.bonus_map[dest]: # conquering a bonus
+					if world_map.bonus_map[dest] not in potential_bonuses:
+						if len(potential_bonuses) >= 3:
+							print "skipping bonus"
+							continue
+					potential_bonuses.add(world_map.bonus_map[dest])
+				if sol_count[dest]:
+					strength = div.n
+				elif world_map.bonus_map[dest]:
+					strength = div.n
+				else:
+					strength = int(div.n * 0.7)
+				conn.move(point, dest, strength, 1)
+				print "moving from", point, layer_map[point], "to", dest, layer_map[dest], "strength", strength, div.n
+				moves_from.append(tuple(point))
 				orders_count += 1
 		except connection.CommandFailedError as e:
 			log.bad(e)
 			if e.errno == 109:
 				print dest, "is swamp"
 				world_map.set_swamp(dest)
+	
+	worker.command(tid=700, points=moves_from, color=(255,255,255))
 	
 	print "my bonuses:", list(world_map.my_bonuses()), list(world_map.good_bonuses())
 	
