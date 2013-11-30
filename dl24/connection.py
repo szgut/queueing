@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import socket
+import time
 
 from dl24 import log
 from dl24 import misc
@@ -8,7 +9,7 @@ from dl24 import scanf
 
 class CommandFailedError(Exception):
 	def __new__(cls, msg, errno=None):
-		exceptions = {6: ForcedWaitingError}
+		exceptions = {6: ForcedWaitingError, 9: NoCurrentWorld}
 		return super(CommandFailedError, cls).__new__(exceptions.get(errno, cls))
 	def __init__(self, msg, errno=None):
 		super(CommandFailedError, self).__init__(msg)
@@ -16,6 +17,10 @@ class CommandFailedError(Exception):
 
 
 class ForcedWaitingError(CommandFailedError):
+	pass
+
+
+class NoCurrentWorld(CommandFailedError):
 	pass
 
 
@@ -56,6 +61,8 @@ class Connection(object):
 			if errno == 7: # forced waiting
 				log.bad(self.readline()) # FORCED_WAITING secs
 				self._read_ack()
+			elif errno == 9:
+				time.sleep(1)
 			raise CommandFailedError(description, errno)
 
 	def _readstr_assert(self, what):
@@ -96,7 +103,7 @@ class Connection(object):
 			self.writeln(*what)
 			try:
 				return self._read_ack()
-			except (ForcedWaitingError, ConnectionResetError):
+			except (ForcedWaitingError, NoCurrentWorld, ConnectionResetError):
 				pass	# repeat the command
 
 	def throwing_cmd(self, *what):
