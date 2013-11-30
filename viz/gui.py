@@ -113,7 +113,7 @@ class Viz(Gui):
 		myfont = pygame.font.SysFont("Sans", 15)
 	
 		pxlen = self.comp_pxlen()
-		for thing in self.things:
+		for _, thing in sorted(self.things.iteritems()):
 			for point in self.things.points(thing):
 
 				if thing.typ == None:
