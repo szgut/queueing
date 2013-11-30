@@ -86,7 +86,7 @@ class Connection(object):
 		'''login to server'''
 		self._readstr_assert('LOGIN')
 		self.writeln(name)
-		self._readstr_assert('PASS')
+		self._readstr_assert('PASSWORD')
 		self.cmd(password)
 
 	def cmd(self, *what):
