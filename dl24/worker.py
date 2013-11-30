@@ -14,7 +14,7 @@ class Point(slottedstruct.SlottedStruct):
 
 
 class Click(slottedstruct.SlottedStruct):
-	__slots__ = ('point', 'tidlist')
+	__slots__ = ('point', 'tidlist', 'button')
 
 
 class Worker(threading.Thread):
@@ -38,7 +38,7 @@ class Worker(threading.Thread):
 	def handle_line(self, line):
 		try:
 			obj = json.loads(line)
-			click = Click(Point(*obj[0]), obj[1])
+			click = Click(Point(*obj[0]), obj[1], obj[2])
 		except (ValueError, IndexError) as e:
 			log.warn(e)
 		self._queue.put(click)
