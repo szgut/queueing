@@ -79,19 +79,38 @@ class Connection(connection.Connection):
 	def where_update_map(self, m, patch_size):
 		best = 0, 0
 		bscore = 0
+		t = time.time()
+		scores = []
+		for y in range(1, self.n+1):
+			line = []
+			for x in range(1, self.n+1):
+				if (x, y) not in m:
+					line.append(self.turn)
+				else:
+					elem = m[x, y]
+					line.append(self.turn - elem.upd)
+			scores.append(line)
 		for x in range(1, self.n+1-patch_size):
 			for y in range(1, self.n+1-patch_size):
 				score = 0
 				for _x in range(x, x+patch_size):
 					for _y in range(y, y+patch_size):
-						if (_x, _y) not in m:
-							score += self.turn
-						else:
-							elem = m[_x, _y]
-							score += self.turn - elem.upd
+						score += scores[_y][_x]
 				if score > bscore:
 					best = x, y
 					bscore = score
+
+		print time.time() - t
+		#cols = [0]*(n-patch_size)
+		#for x in range (1, self.n+1):
+		#	for y in range(1, 6):
+
+		#for y in range(1, self.n+1-patch_size):
+		#	for x in range(1, self.n+1):
+		#		cols[x] += scores[y][x]
+		#	score = 0
+		#	for x in range(1, 6):
+		#		score += cols[x]
 		return best
 
 	def update_contracts(self):
@@ -203,7 +222,7 @@ def loop():
 			gs.m[x, y].upd = -100000
 		else:
 			gs.m[x, y] = Field(7, 0, 0, 'N', 'S', upd=-10000)
-	conn.update_map(10)
+	conn.update_map(5)
 	if len(conn.my_contracts) < 2:
 		contract_ids = conn.contracts.values()
 		conn.acc_contract(contract_ids[0], 20)

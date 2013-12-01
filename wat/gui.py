@@ -44,7 +44,7 @@ class Gui(threading.Thread):
 		i = 0
 		# pipes
 		for rot in range(0, 4):
-			for typ in range(1, 8):
+			for typ in range(1, 7):
 				pts = []
 				my_pts = []
 				for (x, y), f in m.items():
@@ -84,7 +84,7 @@ class Gui(threading.Thread):
 
 		col = (255, 0, 0)
 		for (x, y), rot in conn.sources.items():
-			self.w.command(tid=-1000000+i, points=[(x, y)], typ=7, rot=rot, color=col)
+			self.w.command(tid=1000000+i, points=[(x, y)], typ=7, rot=rot, color=col)
 			i += 1
 
 		self.update_command_window(conn)
