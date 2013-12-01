@@ -77,11 +77,12 @@ class Connection(connection.Connection):
 	def get_field(self, point):
 		self.cmd('GET_FIELD', point.x, point.y)
 		k = self.readint()
-		divisions = []
+		enemies_around = {}
 		for _ in xrange(k):
-			divisions.append(Division(Point(*self.readints(2)), self.readint()))
+			point = Point(*self.readints(2))
+			enemies_around[point] = self.readint()
 			self.readint()
-		return divisions
+		return enemies_around
 	
 	def get_turn_result(self):
 		self.cmd('GET_TURN_RESULT')
@@ -192,14 +193,16 @@ def get_enemies(point, _conn=None):
 	cconn = _conn or conn
 	for neigh in point.neighs():
 		if not sol_count[neigh]: continue
-		divisions = cconn.get_field(neigh)
-		for div in divisions:
-			if div.point == point:
-				return div.n
+		enemies_around = cconn.get_field(neigh)
+		for enpoint, value in enemies_around.iteritems():
+			if enpoint == point:
+				return value
 	return None
 
 
 class Clicker(threading.Thread):
+	
+	target = None
 	
 	def __init__(self):
 		super(Clicker, self).__init__()
@@ -210,9 +213,17 @@ class Clicker(threading.Thread):
 		while True:
 			for click in worker.iterget():
 				point = Point(*click.point)
-				log.good("%s at %s, %d, bonus %d" % (sol_count[point], point, layer_map[point], world_map.bonus_map[point]))
-				enemies = get_enemies(point, self._conn)
-				log.good("enemies: %s" % enemies)
+				if click.button == 1:
+					log.good("%s at %s, %d, bonus %d" % (sol_count[point], point, layer_map[point], world_map.bonus_map[point]))
+					enemies = get_enemies(point, self._conn)
+					log.good("enemies: %s" % enemies)
+				elif click.button == 3:
+					log.good('AAAAA')
+					Clicker.target = point
+				elif click.button == 5:
+					log.good('swamp at %s' % point)
+					world_map.set_swamp(point)
+				print log.good("%s %s" % (click.button, type(click.button)))
 			time.sleep(0.1)
 
 def read_time():
@@ -272,41 +283,69 @@ def target_on_edge(bonus):
 			if sol_count[me]:
 				return me
 			
-def recruit_find(divisions, my_bonuses, good_bonuses):
+def recruit_find(divisions, clusters, my_bonuses, good_bonuses):
+	target = Clicker.target
+	if target is not None:
+		Clicker.target = None
+		return target
+	
 	to_conquer = my_bonuses.difference(good_bonuses)
-	if to_conquer and len(my_bonuses) <= 3:
-		bonus_id = list(to_conquer)[0]
+	if 'spam' not in args.posargs and to_conquer and len(my_bonuses) <= 3:
+		left_on_this_bonus = collections.defaultdict(int)
+		for bonus_id in to_conquer:
+			bonus = world_map.get_bonus(bonus_id)
+			for point in bonus:
+				if not sol_count[point]:
+					left_on_this_bonus[bonus_id] += 1
+		log.bad(left_on_this_bonus.items())
+		bonus_id = min(left_on_this_bonus.keys(), key=lambda bid: left_on_this_bonus[bid]) 
+		
+#		bonus_id = list(to_conquer)[0]
 		print 'conquering remaining %d!' % bonus_id
 		return target_on_edge(world_map.bonuses[bonus_id-1])
 	
-	if len(my_bonuses) < 3:
+	if 'spam' not in args.posargs and len(my_bonuses) < 3:
 		avail_bids = set()
 		for div in divisions:
 			for neigh in div.point.neighs():
 				bid = world_map.bonus_map[neigh]
 				if bid and bid not in my_bonuses:
 					avail_bids.add(bid)
-		avail_bids = sorted(avail_bids, key=lambda bid: len(world_map.get_bonus(bid)), reverse=True)
+		do_reverse = (len(good_bonuses) > 0)
+		avail_bids = sorted(avail_bids, key=lambda bid: len(world_map.get_bonus(bid)), reverse=do_reverse)
+		log.bad(map(lambda bid: (bid, len(world_map.get_bonus(bid))), avail_bids))
 		if avail_bids:
 			print 'conquering biggest!'
 			for div in divisions:
 				for neigh in div.point.neighs():
 					if world_map.bonus_map[neigh] == avail_bids[0]:
 						return div.point
-		
+	
+	if 'boost' in args.posargs:
+		return max(divisions, key=lambda div: div.n).point
+	
+	
 	print 'fueling random...'
 	edge = []
-	for point, layer in layer_map.iteritems():
-		if layer == 1:
-			edge.append(point)
-	return random.Random().choice(edge)
+	for cluster in clusters:
+		for point in cluster:
+			if layer_map[point] == 1:
+				for _ in xrange(len(cluster)):
+					edge.append(point)
+		
+#	for point, layer in layer_map.iteritems():
+#		if layer == 1:
+#			edge.append(point)
+	if edge:
+		return random.Random().choice(edge)
 
 
-def recruit(divisions, my_bonuses, good_bonuses):
+def recruit(divisions, clusters, my_bonuses, good_bonuses):
 	money = conn.money()
 	print 'money: %d' % money
 
-	point = recruit_find(divisions, my_bonuses, good_bonuses)
+	point = recruit_find(divisions, clusters, my_bonuses, good_bonuses)
+	if point is None: return
 	try:
 		print "recruiting %d at %s" % (money, point)
 		conn.recruit_soldiers(point, money)
@@ -317,7 +356,7 @@ def recruit(divisions, my_bonuses, good_bonuses):
 	worker.command(tid=1000, points=[tuple(point)], color=(255,255,0))
 	
 
-def choose_target(point, my_bonuses, potential_bonuses):
+def choose_target(point, my_bonuses, good_bonuses, potential_bonuses):
 	neighs = []
 	for neigh in point.neighs():
 		if not world_map.is_swamp(neigh):
@@ -333,10 +372,38 @@ def choose_target(point, my_bonuses, potential_bonuses):
 			for neigh in neighs:
 				if world_map.bonus_map[neigh] and not sol_count[neigh]:
 					return neigh # attack!
-				
+		
+		lower_neighs = []
 		for neigh in neighs:
 			if layer_map[neigh] < layer_map[point]:
-				return neigh
+				if len(good_bonuses) < 3:
+					lower_neighs.append(neigh)
+				else:
+					if not world_map.bonus_map[neigh] or world_map.bonus_map[neigh] in good_bonuses:
+						lower_neighs.append(neigh)
+					
+		if lower_neighs:
+			if 'lskip' in args.posargs:
+				return lower_neighs[0]
+			for neigh in lower_neighs:
+				if sol_count[neigh]: return neigh
+			enemies_around = conn.get_field(point)
+			for enemy in enemies_around.keys():
+				if sol_count[enemy]:
+					enemies_around[enemy] = 0
+			for neigh in neighs:
+				if neigh not in enemies_around.keys():
+					world_map.set_swamp(neigh)
+					enemies_around[neigh] = 10**9
+			sorted_neighs = sorted(lower_neighs, key=lambda pt: enemies_around[pt])
+			print "ATTACKING %d -> %d" % (sol_count[point], enemies_around[sorted_neighs[0]])
+			if enemies_around[sorted_neighs[0]] > 0.5 * sol_count[point]:
+				if len(sorted_neighs) > 1:
+					log.good('withdrawal')
+					return sorted_neighs[1]
+				return None
+			return sorted_neighs[0]
+		
 	else: # should never happen
 		for neigh in neighs:
 			if not world_map.bonus_map[neigh] and layer_map[neigh] < layer_map[point]:
@@ -368,9 +435,10 @@ def loop():
 	for cluster in clusters:
 		layerize(cluster, my_bonuses, good_bonuses)
 	
-	recruit(divisions, my_bonuses, good_bonuses)
+	recruit(divisions, clusters, my_bonuses, good_bonuses)
 	
 	# draw
+	i = 0
 	for i, cluster in enumerate(clusters):
 		strength = 0
 		points = []
@@ -387,20 +455,22 @@ def loop():
 	
 	# move
 	orders_count = 0
+	trials_count = 0
 	permdiv = sorted(divisions, key=lambda div: div.n, reverse=True)
 #	print permdiv[:5]
 	potential_bonuses = set(my_bonuses)
 	
-	for div in permdiv[:10]:
-		print div
+	print map(lambda div: div.n, permdiv[:20])
 	
 	moves_from = []
 	for div in permdiv:
+		trials_count += 1
+		if trials_count == 10: break
 		if orders_count == 5: break
 		if div.n == 1: break
 		try:
 			point = div.point	
-			dest = choose_target(point, my_bonuses, potential_bonuses)
+			dest = choose_target(point, my_bonuses, good_bonuses, potential_bonuses)
 			if dest is not None:
 				if not sol_count[dest] and world_map.bonus_map[dest]: # conquering a bonus
 					if world_map.bonus_map[dest] not in potential_bonuses:
@@ -409,22 +479,33 @@ def loop():
 							continue
 					potential_bonuses.add(world_map.bonus_map[dest])
 				if sol_count[dest]:
-					strength = div.n
+					if not good_bonuses:
+						strength = div.n
+					else:
+						strength = max(1, div.n - 5)
 				elif world_map.bonus_map[dest]:
 					strength = div.n
 				else:
-					strength = int(div.n * 0.7)
+					if not good_bonuses:
+						strength = div.n
+					else:
+						strength = int(div.n * 0.95)
 				
 				
 				enemies = 0 #get_enemies(dest)
-				if strength < 20 and not sol_count[dest]:
-					enemies = get_enemies(dest)
-				if enemies is None:
-					world_map.set_swamp(dest)
-					continue
-				if enemies > strength:
-					print "skiping attack %d -> %d" % (strength, enemies)
-					continue
+#				if strength < 20: continue
+				
+				if 'skip' in args.posargs:
+					if strength < 10 and not sol_count[dest]:
+						continue
+					if strength < 30 and not sol_count[dest]:
+						enemies = get_enemies(dest)
+					if enemies is None:
+						world_map.set_swamp(dest)
+						continue
+					if enemies > strength:
+						print "skiping attack %d -> %d" % (strength, enemies)
+						continue
 				
 				conn.move(point, dest, strength, 1)
 				
@@ -433,7 +514,7 @@ def loop():
 				moves_from.append(tuple(point))
 				orders_count += 1
 			else:
-				log.bad('WAT?')
+				log.bad('WAT? %s' % point)
 		except connection.CommandFailedError as e:
 			log.bad(e)
 			if e.errno == 109:

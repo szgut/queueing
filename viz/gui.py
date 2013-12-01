@@ -139,6 +139,6 @@ class Viz(Gui):
 def main(clicks_callback=lambda x: None):
 	pygame.init()
 	try:
-		Viz(clicks_callback, (320, 240)).loop()
+		Viz(clicks_callback, (600, 600)).loop()
 	except (KeyboardInterrupt, StopGui):
 		pass

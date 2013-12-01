@@ -26,7 +26,7 @@ def main(host, sport):
 				conn.writeln(raw_input().upper())
 			else:
 				ipu = raw_input()
-				if ipu[:4] == "WAIT":
+				
 					
 	except (EOFError, KeyboardInterrupt):
 		pass
