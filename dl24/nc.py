@@ -21,13 +21,8 @@ def main(host, sport):
 	conn = connection.Connection(host, int(sport))
 	Reader(conn).start()
 	try:
-		if  sport < 7021 or sport > 7022:
-			while True:
-				conn.writeln(raw_input().upper())
-			else:
-				ipu = raw_input()
-				
-					
+		while True:
+			conn.writeln(raw_input().upper())
 	except (EOFError, KeyboardInterrupt):
 		pass
 
@@ -35,6 +30,6 @@ if __name__ == '__main__':
 	try:
 		readline.read_history_file()
 	except IOError:
-		print>>sys.stderr, 'touchnij se ~/.history'
+		print >> sys.stderr, 'touchnij se ~/.history'
 	main(*sys.argv[1:])
 	readline.write_history_file()
