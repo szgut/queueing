@@ -119,17 +119,14 @@ class Viz(Gui):
 				if thing.typ == None:
 					pygame.draw.rect(screen, thing.color, self.square(point, pxlen))
 				else:
-					(orx, ory) = point
-					(orx, ory) = (orx * pxlen, ory * pxlen)
 					for (p1, p2) in self.shapes[thing.typ]:
+						(orx, ory) = point
+						(orx, ory) = (orx * pxlen, ory * pxlen)
 						(p1x, p1y) = self.rotPoint(p1, thing.rot, pxlen)
 						(p2x, p2y) = self.rotPoint(p2, thing.rot, pxlen)
 						p1 = (orx + p1x, ory + p1y)
 						p2 = (orx + p2x, ory + p2y)
 						pygame.draw.line(screen, thing.color, p1, p2)
-					if thing.typ >= 5:
-						pos = (orx + pxlen/2, ory + pxlen/2)
-						pygame.draw.circle(screen, thing.color, pos, 2)
 				
 		for thing in self.things:
 			label = myfont.render(thing.label, 1, (255,255,0))
