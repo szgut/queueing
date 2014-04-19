@@ -50,29 +50,9 @@ class Gui(object):
 		elif event.type == pygame.USEREVENT:
 			event.handle(self)
 
-class Viz(Gui):
-	shapes = [
-		[], # 
-		[((0,3),(3,6))], # 1
-		[((0,3),(3,6)), ((3,0),(3,2)), ((3,4),(3,6))], # 2
-		[((3,0),(3,1)), ((3,1),(1,3)), ((1,3),(0,3))], # 3
-		[((3,0),(3,1)), ((3,1),(1,3)), ((1,3),(0,3)),
-		 ((3,6),(3,5)), ((3,5),(5,3)), ((5,3),(6,3))], # 4
-		[((0,3),(3,6)), ((3,0),(3,3))], # 5
-		[((0,3),(3,6)), ((3,0),(3,6))], # 6
-		[((0,3),(3,3))], # 6
-	]
 
-	def rotPoint(pkt, count):
-		x, y = pkt
-		x -= 3
-		y -= 3
-		for _ in xrange(0, count):
-			x, y = -y, x
-		x += 3
-		y += 3
-		return (x, y)
-		
+
+class Viz(Gui):
 	
 	def __init__(self, callback, *args):
 		super(Viz, self).__init__(*args)
@@ -110,17 +90,7 @@ class Viz(Gui):
 		pxlen = self.comp_pxlen()
 		for _, thing in sorted(self.things.iteritems()):
 			for point in self.things.points(thing):
-
-				if thing.typ == None:
-					pygame.draw.rect(screen, thing.color, self.square(point, pxlen))
-				else:
-					for (p1, p2) in shapes[thing.typ]:
-						(orx, ory) = self.square(point, pxlen)
-						(p1x, p1y) = rotPoint(p1, thing.rot) * pxlen / 6
-						(p2x, p2y) = rotPoint(p2, thing.rot) * pxlen / 6
-						p1 = (orx + p1x, ory + p1y)
-						p2 = (orx + p2x, ory + p2y)
-						pygame.draw.line(screen, thing.color, p1, p2)
+				pygame.draw.rect(screen, thing.color, self.square(point, pxlen))
 				
 		for thing in self.things:
 			label = myfont.render(thing.label, 1, (255,255,0))

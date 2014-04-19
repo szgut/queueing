@@ -42,8 +42,6 @@ class Command(object):
 
 
 class ThingsSet(object):
-	reversed = False
-	
 	def __init__(self):
 		self._things = {}
 		#self._heap_x = sortedset([0], getmax=True)
@@ -52,8 +50,6 @@ class ThingsSet(object):
 	def add(self, tid, thing):
 		#if tid in self._things:
 		#	self._remove_old_points(self._things[tid])
-		if thing.typ is not None:
-			self.reversed = True
 		self._things[tid] = thing
 		#for x, y in thing.points:
 		#	self._heap_x.add(x)
@@ -72,10 +68,7 @@ class ThingsSet(object):
 	#		self._heap_y.remove(y)		
 	
 	def reverse(self, point):
-		if not reversed:
-			return (point[0], self.size[1] - point[1])
-		else:
-			return point
+		return (point[0], self.size[1] - point[1])
 	
 	def tids_at(self, point):
 		for tid, thing in self._things.iteritems():
