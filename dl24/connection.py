@@ -43,7 +43,6 @@ class Connection(object):
 		try: return fun(self.f)
 		except EOFError:
 			log.warn("połączenie zerwane")
-			self._connect_and_login()
 			raise ConnectionResetError
 	
 	def readint(self):   return self._catch_read(scanf.readint)
@@ -75,7 +74,7 @@ class Connection(object):
 		if not isinstance(what, list):
 			what = [what]
 		if result not in what:
-			log.warn(result)
+			log.warn("expected %s, got: %s" % (what, result))
 		return result
 
 	def writeln(self, *what):
@@ -89,7 +88,7 @@ class Connection(object):
 		self.f = s.makefile('r+', 1)
 		s.close()
 	
-	@misc.insist((EOFError, socket.error), wait=2)
+	@misc.insist((ConnectionResetError, EOFError, socket.error), wait=2)
 	def _connect_and_login(self):
 		self._connect()
 		self._login()
@@ -99,7 +98,8 @@ class Connection(object):
 		self._readstr_assert('LOGIN')
 		self.writeln(name)
 		self._readstr_assert('PASSWORD')
-		self.cmd(password)
+		self.writeln(password)
+		self._read_ack()
 
 	def cmd(self, *what):
 		'''sends command what, waits for OK, reads some lines'''
@@ -107,7 +107,9 @@ class Connection(object):
 			self.writeln(*what)
 			try:
 				return self._read_ack()
-			except (ForcedWaitingError, NoCurrentWorld, ConnectionResetError):
+			except ConnectionResetError:
+				self._connect_and_login()
+			except (ForcedWaitingError, NoCurrentWorld):
 				pass	# repeat the command
 
 	def throwing_cmd(self, *what):
