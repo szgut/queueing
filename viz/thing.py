@@ -50,9 +50,6 @@ class ThingsSet(object):
 		except KeyError:
 			pass
 	
-	def reverse(self, point):
-		return (point[0], self.size[1] - point[1])
-	
 	def tids_at(self, point):
 		for tid, thing in self._things.iteritems():
 			if point in thing.points:

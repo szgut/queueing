@@ -64,10 +64,10 @@ class Viz(Gui):
 			
 	def handle_click(self, pos, button):
 		pxlen = self.comp_pxlen()
-		rpoint = self.things.reverse((pos[0]/pxlen, pos[1]/pxlen))
-		tids = list(self.things.tids_at(rpoint))
-		print rpoint, tids
-		self.callback(rpoint, tids, button)	
+		point = (pos[0] / pxlen, pos[1] / pxlen)
+		tids = list(self.things.tids_at(point))
+		print point, tids
+		self.callback(point, tids, button)
 	
 	@staticmethod
 	def square(point, pxlen):
