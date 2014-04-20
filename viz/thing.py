@@ -1,15 +1,11 @@
-#from dl24.misc import sortedset
 import pygame
 
 class Thing(object):
-	def __init__(self, points, label='', color=(0,0,255), typ=None, rot=0, **kwargs):
+	def __init__(self, points, label='', color=(0,0,255), **kwargs):
 		self.points = map(tuple, points)
 		self.label = label
 		self.color = color
 		self.center = self._mass_center()
-		self.typ = typ
-		if typ == -1: self.typ = None
-		self.rot = rot
 	
 	def _mass_center(self):
 		if not self.points: return (0,0)
@@ -44,28 +40,15 @@ class Command(object):
 class ThingsSet(object):
 	def __init__(self):
 		self._things = {}
-		#self._heap_x = sortedset([0], getmax=True)
-		#self._heap_y = sortedset([0], getmax=True)
 	
 	def add(self, tid, thing):
-		#if tid in self._things:
-		#	self._remove_old_points(self._things[tid])
 		self._things[tid] = thing
-		#for x, y in thing.points:
-		#	self._heap_x.add(x)
-		#	self._heap_y.add(y)
 	
 	def remove(self, tid):
-		#self._remove_old_points(self._things[tid])
 		try:
 			del self._things[tid]
 		except KeyError:
 			pass
-	
-	#def _remove_old_points(self, thing):
-	#	for x, y in thing.points:
-	#		self._heap_x.remove(x)
-	#		self._heap_y.remove(y)		
 	
 	def reverse(self, point):
 		return (point[0], self.size[1] - point[1])
@@ -81,7 +64,6 @@ class ThingsSet(object):
 	
 	@property
 	def size(self):
-		#return self._heap_x.top(), self._heap_y.top()
 		maxx, maxy = 0, 0
 		for thing in self:
 			for point in thing.points:

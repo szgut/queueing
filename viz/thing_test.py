@@ -9,7 +9,6 @@ class TestThingsSet(unittest.TestCase):
 		self.assertEqual(ts.size, (0,0))
 		
 		ts.add(1, thing.Thing([(1,2), (3, 0)])) 
-		print ts._heap_x._heap
 		self.assertEqual(ts.size, (3,2))
 		
 		ts.add(4, thing.Thing([(7, 1)]))
