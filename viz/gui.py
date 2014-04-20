@@ -1,5 +1,3 @@
-import time
-
 import pygame.event
 import thing
 
@@ -25,20 +23,22 @@ class Gui(object):
 		self._size = size
 		self._screen = pygame.display.set_mode(self._size, pygame.HWSURFACE|pygame.DOUBLEBUF|pygame.RESIZABLE)
 		self.render(self._screen)
-		
+
+	@staticmethod
+	def events():
+		yield pygame.event.wait()
+		event = pygame.event.poll()
+		while event.type != pygame.NOEVENT:
+			yield event
+			event = pygame.event.poll()
+
 	def loop(self):
 		self._set_screen_size(self._size)
 		while True:
 			pygame.event.pump()
-			events = list(pygame.event.get())
-			if events:
-				for event in events:
-					self._handle_event(event)
+			if any(map(self._handle_event, self.events())):
 				self.render(self._screen)
-				pygame.display.flip()
-			else:
-				time.sleep(0.1)
-			
+			pygame.display.flip()
 
 	def _handle_event(self, event):
 		if event.type == pygame.QUIT:
@@ -49,7 +49,9 @@ class Gui(object):
 			self.handle_click(event.pos, event.button)
 		elif event.type == pygame.USEREVENT:
 			event.handle(self)
-
+		elif event.type == pygame.MOUSEMOTION:
+			return False
+		return True
 
 
 class Viz(Gui):
