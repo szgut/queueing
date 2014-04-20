@@ -3,6 +3,7 @@ import json
 import multiprocessing
 import socket
 import sys
+import time
 import threading
 
 import pygame
@@ -21,7 +22,6 @@ def listen(port=1234):
 		yield process
 #		process.daemon = True
 		process.start()
-		
 
 
 def daemon_run(target):
@@ -55,18 +55,26 @@ class Connection(multiprocessing.Process):
 		print 'connection lost'
 		gui.schedule(lambda *x: sys.exit())
 
+	@staticmethod
+	def handle_input(obj):
+		if not isinstance(obj, dict):
+			return
+		cmd = thing.Command(**obj)
+		while True:
+			try:
+				return gui.schedule(lambda gui: cmd(gui.things))
+			except pygame.error:
+				time.sleep(0)
+
 	def run(self):
 		sys.stdin.close()
 		self.cfile = self.sock.makefile('r+', 1)
-		
+
 		pygame.init()
 		daemon_run(self.read_socket_lines)
 		gui.main(self.clicked_callback)
-		print 'gui closed'
-	
-	def handle_input(self, obj):
-		if isinstance(obj, dict):
-			gui.schedule(lambda gui: thing.Command(**obj)(gui.things))
+		self.sock.shutdown(socket.SHUT_WR)
+		print 'closed gui', pygame.display.get_caption()[0]
 	
 	def clicked_callback(self, point, tids, button):
 		try:
@@ -75,13 +83,12 @@ class Connection(multiprocessing.Process):
 			print e
 	
 
-
 def main():
 	try:
 		processes = []
 		for process in listen():
 			processes.append(process)
-	except KeyboardInterrupt:
+	except:
 		print '\nkilling guis'
 		for process in processes:
 			process.terminate()
