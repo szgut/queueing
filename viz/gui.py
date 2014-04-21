@@ -15,13 +15,14 @@ def schedule(callback):
 
 
 class Gui(object):
-	
+
 	def __init__(self, size):
 		self._size = size
-		
+
 	def _set_screen_size(self, size):
 		self._size = size
-		self._screen = pygame.display.set_mode(self._size, pygame.HWSURFACE|pygame.DOUBLEBUF|pygame.RESIZABLE)
+		self._screen = pygame.display.set_mode(self._size, pygame.HWSURFACE | pygame.DOUBLEBUF | pygame.RESIZABLE)
+		pygame.key.set_repeat(200, 35)
 		self.render(self._screen)
 
 	@staticmethod
@@ -47,6 +48,8 @@ class Gui(object):
 			self._set_screen_size(event.size)
 		elif event.type == pygame.MOUSEBUTTONUP:
 			self.handle_click(event.pos, event.button)
+		elif event.type == pygame.KEYDOWN:
+			self.handle_keydown(event.key)
 		elif event.type == pygame.USEREVENT:
 			event.handle(self)
 		elif event.type == pygame.MOUSEMOTION:
@@ -55,48 +58,73 @@ class Gui(object):
 
 
 class Viz(Gui):
-	
+
+	SCROLL_BTNS = {4: pygame.K_EQUALS, 5: pygame.K_MINUS}
+	ZOOM_STEP = 1.25
+	Z = {pygame.K_EQUALS: ZOOM_STEP, pygame.K_MINUS: 1 / ZOOM_STEP}
+	V = {pygame.K_LEFT: (-1, 0), pygame.K_RIGHT: (1, 0),
+		 pygame.K_UP: (0, -1), pygame.K_DOWN: (0, 1)}
+
 	def __init__(self, callback, *args):
 		super(Viz, self).__init__(*args)
 		self.callback = callback
-		
+		self._reset_zoom()
 		self.things = thing.ThingsSet()
-		#self.things.add(1, thing.Thing([(0,0), (2,0)], label=u"cos"))
-		#self.things.add(2, thing.Thing([(1,1), (0,0)], color=(255,0,0), label="trzy"))
-			
+
+	def _reset_zoom(self):
+		self.O = (0, 0)
+		self.zoom = 1.0
+
 	def handle_click(self, pos, button):
-		pxlen = self.comp_pxlen()
-		point = (pos[0] / pxlen, pos[1] / pxlen)
-		tids = list(self.things.tids_at(point))
-		print point, tids
-		self.callback(point, tids, button)
-	
-	@staticmethod
-	def square(point, pxlen):
-		x, y = point
-		p1 = (x*pxlen, y*pxlen)
-		return pygame.Rect(p1, (pxlen, pxlen))
-	
+		if button in self.SCROLL_BTNS:
+			self._zoom(self.SCROLL_BTNS[button],
+					   float(pos[0])/self._size[0], float(pos[1])/self._size[1])
+		else:
+			scale, shift = self.comp_scale(), self.shift()
+			point = ((pos[0] + shift[0])/scale, (pos[1]+shift[1])/scale)
+			tids = list(self.things.tids_at(point))
+			print point, tids
+			self.callback(point, tids, button)
+
+	def handle_keydown(self, key):
+		if key in self.V:
+			p = self.comp_pxlen()
+			v = self.V.get(key, (0, 0))
+			self.O = (self.O[0] + p * v[0], self.O[1] + p * v[1])
+		elif key in self.Z:
+			self._zoom(key)
+		if key == pygame.K_0:
+			self._reset_zoom()
+
+	def _zoom(self, key, kx=0.5, ky=0.5):
+		z = self.Z[key]
+		w, h = self._size
+		x = self.O[0] + kx * (1 - 1.0 / z) * w / self.zoom
+		y = self.O[1] + ky * (1 - 1.0 / z) * h / self.zoom
+		self.O = (x, y)
+		self.zoom *= z
+
 	def comp_pxlen(self):
 		sqsz = self.things.size
-		return min(self._size[0]/(sqsz[0]+1), self._size[1]/(sqsz[1]+1))
-	
-	def center(self, point, pxlen):
-		rpoint = self.things.reverse(point)
-		return tuple(map(lambda x: (x+0.5)*pxlen, rpoint))
-	
+		return max(1, min(self._size[0] / (sqsz[0] + 1), self._size[1] / (sqsz[1] + 1)))
+
+	def comp_scale(self):
+		return int(round(self.comp_pxlen() * self.zoom))
+
+	def shift(self):
+		return (int(self.O[0] * self.zoom), int(self.O[1] * self.zoom))
+
 	def render(self, screen):
-		pygame.draw.rect(screen, (0,0,0), pygame.Rect((0,0), self._size))
-		myfont = pygame.font.SysFont("Sans", 15)
-	
-		pxlen = self.comp_pxlen()
+		pygame.draw.rect(screen, (0, 0, 0), pygame.Rect((0, 0), self._size))
+		scale = self.comp_scale()
+		shift = self.shift()
+		font = pygame.font.SysFont("Sans", scale)
+
 		for _, thing in sorted(self.things.iteritems()):
-			for point in self.things.points(thing):
-				pygame.draw.rect(screen, thing.color, self.square(point, pxlen))
-				
+			thing.draw(screen, scale, shift)
+
 		for thing in self.things:
-			label = myfont.render(thing.label, 1, (255,255,0))
-			screen.blit(label, self.center(thing.center, pxlen))		
+			thing.draw_label(screen, scale, shift, font)
 
 
 def main(clicks_callback=lambda x: None):

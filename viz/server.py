@@ -20,7 +20,6 @@ def listen(port=1234):
 	while True:
 		process = Connection(sock.accept()[0])
 		yield process
-#		process.daemon = True
 		process.start()
 
 
@@ -44,7 +43,7 @@ class Connection(multiprocessing.Process):
 				yield line
 		except IOError:
 			print 'closed'
-	
+
 	def read_socket_lines(self):
 		sys.stdin.close()
 		for line in self.socket_lines():
@@ -75,13 +74,13 @@ class Connection(multiprocessing.Process):
 		gui.main(self.clicked_callback)
 		self.sock.shutdown(socket.SHUT_WR)
 		print 'closed gui', pygame.display.get_caption()[0]
-	
+
 	def clicked_callback(self, point, tids, button):
 		try:
 			print>>self.cfile, json.dumps((point, tids, button))
 		except IOError as e:
 			print e
-	
+
 
 def main():
 	try:
@@ -93,6 +92,6 @@ def main():
 		for process in processes:
 			process.terminate()
 
-	
+
 if __name__ == '__main__':
 	main()

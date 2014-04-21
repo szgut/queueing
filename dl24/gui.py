@@ -92,4 +92,6 @@ class Worker(threading.Thread):
 if __name__ == '__main__':
 	w = Worker(title='Muminki')
 	w.command(tid=(6, "bla"), points=[(1, 2), (2, 3), (3, 4)], label='siedę')
+	for x in xrange(6):
+		w.command(tid=x+10, points=[(x,x)], color=Color.LIGHT_BLUE)
 	w.join()
