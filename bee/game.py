@@ -70,7 +70,7 @@ class Card(object):
 def select_mode(cards):
 	if len(cards) != 8:
 		raise ValueError("wrong number of cards during selection: %i!" % len(my_cards))
-	quality = sum([c.val for c in my_cards]) / 8.0
+	quality = sum([c.val for c in cards]) / 8.0
 	if quality >= 8:
 		return 'A'
 	else:

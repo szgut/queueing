@@ -45,7 +45,10 @@ class Connection(connection.Connection):
 	def select_game(self, t):
 		if t not in ['A', 'L']:
 			raise ValueError("attempt to choose wrong game type")
-		self.cmd("select_game", t)
+		try:
+			self.cmd("select_game", t)
+		except connection.CommandFailedError:
+			print "warning: cannot select mode, already selected this one..."
 
 	def select_kitty(self, cards):
 		if len(cards) != 4:
@@ -115,14 +118,16 @@ def loop():
 			trick, fst_player, winner = conn.last_trick()
 			print "last trick: %s, started:%i winner:%i" % (
 					str_cards(trick), fst_player, winner)
+			print
 			if last_mode == 'A' and winner == my_last_id:
-				print GREEN + "WON!!! (took a trick)" + RESET
+				print GREEN + "\t\t\tWON!!! (took a trick)" + RESET
 			elif last_mode == 'A' and winner != my_last_id:
-				print YELLOW + "didn't win (someone took trick)"
+				print RED + "\t\t\tLOST (someone took trick)"
 			elif last_mode == 'L' and winner == my_last_id:
-				print RED + "Oh, noez, took trick, shouldn't have:(" + RESET
+				print RED + "\t\t\tLOST (took trick, shouldn't have:()" + RESET
 			elif last_mode == 'L' and winner != my_last_id:
-				print GREEN + "WON!!! (didn't take trick)" + RESET
+				print GREEN + "\t\t\tWON!!! (didn't take trick)" + RESET
+			print
 		else:
 			print "game finished, not checking who took the trick"
 
@@ -133,6 +138,8 @@ def loop():
 		if me == selector_id:
 			my_cards = conn.get_my_cards()
 			mode = select_mode(my_cards)
+			print "my 8 cards: %s" % str_cards(my_cards)
+			print "selecting %s" % mode
 			conn.select_game(mode)
 		else:
 			print "someone is selecting mode..."
@@ -143,6 +150,8 @@ def loop():
 		if me == selector_id:
 			my_cards = conn.get_my_cards()
 			kitty = select_kitty(mode, my_cards)
+			print "my 20 cards: %s" % str_cards(my_cards)
+			print "selecting kitty: %s" % str_cards(kitty)
 			conn.select_kitty(kitty)
 		else:
 			print "someone is selecting kitty..."
@@ -174,6 +183,9 @@ def loop():
 			print "playing %s" % str(to_play)
 			if to_play is not None:
 				conn.play(to_play)
+		else:
+			print "someone playing now..."
+
 	else:
 		print "BREAK STATE"
 
