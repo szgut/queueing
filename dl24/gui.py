@@ -20,6 +20,8 @@ class Color(object):
 	LIGHT_BLUE = (100, 100, 255)
 	YELLOW = (255, 255, 0)
 	BROWN = (150, 60, 0)
+	MAGENTA = (255, 0, 255)
+	PINK = (255, 50, 100)
 
 
 class Button(object):
