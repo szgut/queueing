@@ -142,7 +142,7 @@ def play_L(hand, table, left):
 		suit = table[0].suit
 		suited = filter(lambda c: c.suit == suit, hand)
 		if there_are(suited):
-			return play_L_suited(suited, suit, table)
+			return play_L_suited(suited, suit, table, left)
 		else:
 			# no good cards, choose highest, because it's least valuable
 			return max_card(hand)
@@ -150,17 +150,28 @@ def play_L(hand, table, left):
 		# starting
 		return min_card(hand)
 
-def play_L_suited(suited, suit, table):
-		max_on_table = max_card(table, only_suit=suit)
-		# find the highest which is lower than max suited on table
-		guarantees = filter(lambda c: c.val < max_on_table.val, suited)
-		if there_are(guarantees):
-			return max_card(guarantees)
+def play_L_suited(suited, suit, table, left):
+	if len(table) == 1:
+		min_opponent = min_card(left, only_suit=suit)
+		if min_opponent is not None:
+			min_opponent = min_opponent.val
 		else:
-			# can't assert win :(
-			if len(table) == 1:
-				# put lowest, hoping someone will play higher
-				return min_card(suited)
+			min_opponent = 15
+		less_than_op = filter(lambda c: c.val < min_opponent,
+				suited)
+		if there_are(less_than_op):
+			print BLUE + "about to win!!!" + RESET
+			return max_card(less_than_op)
+		else:
+			less_than_table = filter(lambda c: c.val < table[0].val, suited)
+			if there_are(less_than_table):
+				return max_card(less_than_table)
 			else:
-				# use highest, we're loosing anyway
-				return max_card(suited)
+				return min_card(suited)
+	else:
+		table_max = max_card(table, only_suit=suit)
+		less_than_table = filter(lambda c: c.val < table_max, suited)
+		if there_are(less_than_table):
+			return max_card(less_than_table)
+		else:
+			return max_card(suited)
