@@ -79,3 +79,33 @@ def play_A(hand, table):
 	else:
 		# starting
 		return max(hand, key=lambda c: c.val)
+
+def play_L(hand, table):
+	if len(table) != 0:
+		# adding a card
+		suit = table[0].suit
+		suited = filter(lambda c: c.suit == suit, hand)
+		if len(suited) == 0:
+			# no good cards, choose highest, because it's least valuable
+			return max(hand, key=lambda c: c.val)
+		else:
+			return play_L_suited(suited, suit, table)
+	else:
+		# starting
+		return min(hand, key=lambda c: c.val)
+
+def play_L_suited(suited, suit, table):
+		suited_on_table = filter(lambda c: c.suit == suit, table)
+		max_on_table = max(suited_on_table, key=lambda c: c.val)
+		# find the highest which is lower than max suited on table
+		guarantees = filter(lambda c: c.val < max_on_table.val, suited)
+		if len(guarantees) != 0:
+			return max(guarantees, key=lambda c: c.val)
+		else:
+			# can't assert win :(
+			if len(table) < 2:
+				# put lowest, hoping someone will play higher
+				return min(suited, key=lambda c: c.val)
+			else:
+				# use highest, we're loosing anyway
+				return max(suited, key=lambda c: c.val)

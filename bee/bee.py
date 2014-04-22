@@ -110,17 +110,19 @@ def loop():
 
 	st = conn.get_state()
 	if write_trick_next_time:
+		write_trick_next_time = False
 		if st == 'TRICK':
 			trick, fst_player, winner = conn.last_trick()
 			print "last trick: %s, started:%i winner:%i" % (
 					str_cards(trick), fst_player, winner)
 			if last_mode == 'A' and winner == my_last_id:
 				print GREEN + "WON!!! (took a trick)" + RESET
+			elif last_mode == 'A' and winner != my_last_id:
+				print YELLOW + "didn't win (someone took trick)"
 			elif last_mode == 'L' and winner == my_last_id:
 				print RED + "Oh, noez, took trick, shouldn't have:(" + RESET
 			elif last_mode == 'L' and winner != my_last_id:
 				print GREEN + "WON!!! (didn't take trick)" + RESET
-			write_trick_next_time = False
 		else:
 			print "game finished, not checking who took the trick"
 
@@ -151,7 +153,7 @@ def loop():
 			if mode == 'A':
 				to_play = play_A(hand = my_cards, table = on_table)
 			else:
-				to_play = None
+				to_play = play_L(hand = my_cards, table = on_table)
 			print "playing %s" % str(to_play)
 			if to_play is not None:
 				conn.play(to_play)
