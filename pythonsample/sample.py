@@ -28,7 +28,7 @@ def parse_args():
 		help="universum number", default=1)
 	parser.add_argument("-d", "--dontload", action='store_false', 
 		help="do not load initial state from dump file", dest='loadstate')
-	parser.add_argument('posargs', nargs='?', default=[])
+	parser.add_argument('posargs', nargs='*', default=[])
 	return parser.parse_args()
 
 
