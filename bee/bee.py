@@ -14,8 +14,50 @@ from game import *
 class Config(object):
 	def __init__(self, universum=1):
 		self.host = 'universum.dl24'
-		self.datafile = 'data'
+		self.datafile = 'data' + str(universum)
 		self.port = 20000+universum-1
+
+
+class Statistic(object):
+	def __init__(self):
+		self.wins = 0
+		self.losses = 0
+		self.run_wins = 0
+		self.run_losses = 0
+		self.round_wins = 0
+		self.round_losses = 0
+
+	def collect_win(self):
+		self.wins += 1
+		self.run_wins += 1
+		self.round_wins += 1
+
+	def collect_loss(self):
+		self.losses += 1
+		self.run_losses += 1
+		self.round_losses += 1
+
+	def new_round(self):
+		self.round_wins = self.round_losses = 0
+
+	def new_run(self):
+		self.run_wins = self.run_losses = 0
+
+	def ratio_str(self, wins, losses):
+		if losses != 0:
+			ratio = wins*1.0 / losses
+		else:
+			ratio = "-"
+		return ("%s ("+GREEN+"%i"+RESET+"/"+RED+"%i"+RESET+")") % (
+				ratio,
+				wins, losses)
+
+	def __str__(self):
+		s = ""
+		s += "\twin/loss ratio  : " + self.ratio_str(self.wins, self.losses) + "\n"
+		s +=  "\t\t run    : " + self.ratio_str(self.run_wins,   self.run_losses) + "\n"
+		s +=  "\t\t round  : " + self.ratio_str(self.round_wins, self.round_losses) + "\n"
+		return s
 
 
 class Connection(connection.Connection):
@@ -25,7 +67,11 @@ class Connection(connection.Connection):
 		else:
 			num = 1 # doesn't matter
 		if num != 0:
-			return map(Card, self.readline().strip().split(' '))
+			line = self.readline()
+			# "no trick played ... bla bla"
+			if line[:2] in ["no", "ga"]:
+				return None
+			return map(Card, line.strip().split(' '))
 		else:
 			return []
 
@@ -77,8 +123,11 @@ class Connection(connection.Connection):
 	def last_trick(self):
 		self.cmd("last_trick")
 		trick = self.read_cards(read_num = False)
-		fst_player, winner = self.readints(2)
-		return (trick, fst_player, winner)
+		if trick is not None:
+			fst_player, winner = self.readints(2)
+			return (trick, fst_player, winner)
+		else:
+			return (None, None, None)
 
 def parse_args():
 	parser = argparse.ArgumentParser()
@@ -92,47 +141,62 @@ def parse_args():
 
 class PersistentState(object):
 	def __init__(self):
-		self.a = 0
+		self.stat = Statistic()
 
 
 def init_state(read):
 	global gs
 	if read:
 		gs = serializer.load()
+		gs.stat.new_round()
+		gs.stat.new_run()
 	else:
 		gs = PersistentState()
-
 
 write_trick_next_time = False
 my_last_id = 0
 last_mode = None
+last_num_cards = -1
+
+stat = Statistic()
+
 def loop():
 	global write_trick_next_time
 	global my_last_id
 	global last_mode
+	global gs
+	global stat
+	global last_num_cards
 
 	st = conn.get_state()
 	if write_trick_next_time:
+		print "---------------------------------------------"
 		write_trick_next_time = False
-		if st == 'TRICK':
-			trick, fst_player, winner = conn.last_trick()
+		trick, fst_player, winner = conn.last_trick()
+		if trick is not None:
 			print "last trick: %s, started:%i winner:%i" % (
 					str_cards(trick), fst_player, winner)
 			print
 			if last_mode == 'A' and winner == my_last_id:
 				print GREEN + "\t\t\tWON!!! (took a trick)" + RESET
+				gs.stat.collect_win()
 			elif last_mode == 'A' and winner != my_last_id:
-				print RED + "\t\t\tLOST (someone took trick)"
+				print RED + "\t\t\tLOST (someone took trick)" + RESET
+				gs.stat.collect_loss()
 			elif last_mode == 'L' and winner == my_last_id:
 				print RED + "\t\t\tLOST (took trick, shouldn't have:()" + RESET
+				gs.stat.collect_loss()
 			elif last_mode == 'L' and winner != my_last_id:
 				print GREEN + "\t\t\tWON!!! (didn't take trick)" + RESET
+				gs.stat.collect_win()
+			print gs.stat
 			print
 		else:
-			print "game finished, not checking who took the trick"
+			print "cannot retrieve who won, ignoring..."
 
 	print '---'
 	if st == 'GAME_SELECTION':
+		gs.stat.new_round()
 		me = conn.get_my_id()
 		selector_id = conn.selector_id()
 		if me == selector_id:
@@ -169,10 +233,11 @@ def loop():
 				plays, selector_id, RESET)
 		my_cards = conn.get_my_cards()
 		on_table = conn.on_table()
-		if len(on_table) == 2:
+		if len(on_table) == 2 and last_num_cards in [1, 2]:
 			write_trick_next_time = True
 			my_last_id = me
 			last_mode = mode
+		last_num_cards = len(on_table)
 		print "my cards: %s" % str_cards(my_cards)
 		print "table:    %s" % str_cards(on_table)
 		if plays == me:
@@ -199,8 +264,6 @@ if __name__ == '__main__':
 	log.info("logged in")
 
 	init_state(args.loadstate)
-	gs.a += 1
-	print gs.a
 
 	try: # main loop
 		while 1:
