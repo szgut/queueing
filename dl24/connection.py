@@ -61,7 +61,7 @@ class Connection(object):
 			msg = self.readline()
 			description = "FAILED " + str(errno) + " " + msg
 			log.bad(description)
-			if errno == 7: # forced waiting
+			if errno == 6: # forced waiting
 				log.bad(self.readline()) # FORCED_WAITING secs
 				self._read_ack()
 			elif errno == 9:
