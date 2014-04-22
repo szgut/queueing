@@ -54,7 +54,7 @@ class Connection(object):
 	
 	def _read_ack(self):
 		'''waits for OK'''
-		OK, FAILED = 'OK', 'ERROR'
+		OK, FAILED = 'OK', 'FAILED'
 		result = self._readstr_assert([OK, FAILED])
 		if result == FAILED:
 			errno = self.readint()
