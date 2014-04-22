@@ -54,13 +54,15 @@ class Command(object):
 			thingsset.add(self.tid, self.thing)
 		elif self.action == 'remove':
 			thingsset.remove(self.tid)
+		elif self.action == 'clear':
+			thingsset.clear()
 		elif self.action == 'set_title':
 			pygame.display.set_caption(self.title)
 
 
 class ThingsSet(object):
 	def __init__(self):
-		self._things = {}
+		self.clear()
 
 	def add(self, tid, thing):
 		self._things[tid] = thing
@@ -70,6 +72,9 @@ class ThingsSet(object):
 			del self._things[tid]
 		except KeyError:
 			pass
+
+	def clear(self):
+		self._things = {}
 
 	def tids_at(self, point):
 		for tid, thing in self._things.iteritems():
