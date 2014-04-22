@@ -101,8 +101,11 @@ class Viz(Gui):
 		w, h = self._size
 		x = self.O[0] + kx * (1 - 1.0 / z) * w / self.zoom
 		y = self.O[1] + ky * (1 - 1.0 / z) * h / self.zoom
-		self.O = (x, y)
 		self.zoom *= z
+		if self.zoom > 2:
+			self.zoom = 2
+		else:
+			self.O = (x, y)
 
 	def comp_pxlen(self):
 		sqsz = self.things.size
