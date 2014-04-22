@@ -11,8 +11,8 @@ class CommandFailedError(Exception):
 	def __new__(cls, msg, errno=None):
 		exceptions = {
 					6: ForcedWaitingError,
-					7: ForcedWaitingError,
-					9: NoCurrentWorld
+					#7: ForcedWaitingError,
+					#9: NoCurrentWorld
 				}
 		return super(CommandFailedError, cls).__new__(exceptions.get(errno, cls))
 	def __init__(self, msg, errno=None):
@@ -97,7 +97,7 @@ class Connection(object):
 		'''login to server'''
 		self._readstr_assert('LOGIN')
 		self.writeln(name)
-		self._readstr_assert('PASSWORD')
+		self._readstr_assert('PASS')
 		self.writeln(password)
 		self._read_ack()
 
