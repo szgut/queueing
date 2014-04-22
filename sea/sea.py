@@ -39,6 +39,12 @@ class Connection(connection.Connection):
 			ships.append(ship)
 		return ships
 	
+	def readendur(self):
+		endur = self.readstr()
+		if endur != 'INF':
+			endur = int(endur)
+		return endur
+	
 	def list_lands_nearby(self):
 		self.cmd('list_lands_nearby')
 		n = self.readint()
@@ -65,6 +71,23 @@ class Connection(connection.Connection):
 			ships.append(ship)
 		return ships
 	
+	def list_owned_items(self):
+		self.cmd('list_owned_items')
+		ports, towers, artifacts = [], [], []
+		n = self.readint()
+		for _ in xrange(n):
+			pos = Point(*self.readints(2))
+			typ = self.readstr()
+			endur = self.readendur()
+			if typ.endswith('ARTIFACT'):
+				artifacts.append(Ship(id=1, pos=pos, type=typ, endur=endur))
+			elif typ == 'TOWER':
+				towers.append(Field(pos=pos, type=typ, endur=endur, owner='ME'))
+			else:
+				ports.append(Field(pos=pos, type=typ, endur=endur, owner='ME'))
+		return ports, towers, artifacts
+			
+	
 	def my_stat_str(self):
 		self.cmd('my_stat')
 		return self.readline()
@@ -84,7 +107,9 @@ class Connection(connection.Connection):
 		return self.time_to_full_moon()[2]
 	
 	def move(self, ship_id, dx, dy):
-		self.cmd('move', ship_id, dx, dy)
+		#print "move", ship_id
+		self.throwing_cmd('move', ship_id, dx, dy)
+		#print "moved", ship_id
 	
 	def shoot(self, ship_id, diff):
 		self.cmd('shoot', ship_id, diff.x, diff.y)
@@ -92,6 +117,9 @@ class Connection(connection.Connection):
 	def launch_ship(self, ship_type='DESTROYER'):
 		self.cmd('launch_ship', ship_type)
 		return self.readints(3)
+	
+	def myk(self, typ, ship_id, diff):
+		self.cmd(typ, ship_id, diff.x, diff.y)
 		
 
 def parse_args():
@@ -112,12 +140,15 @@ class WorldMap(object):
 		self.A = A
 
 		self.fields_map = {}
+		self.islands = set()
 		self.read_fields()
 		
 		self.artifacts = []
 		
+		self.poses = []
+		
 	def read_fields(self):
-		self.islands = set()
+		#self.islands = set()
 		self.ports = set()
 		self.towers = set()
 		for field in conn.list_lands_nearby():
@@ -134,37 +165,55 @@ class WorldMap(object):
 			return False
 		return pos not in self.fields_map and pos not in self.temp_map
 	
-	def read_enemies_artifacts(self):
-		self.enemies, self.artifacts = [], []
-		
-	
 	def tick(self):
 		self.temp_map = {}
 		self.ships, self.enemies, self.artifacts = [], [], []
 		for ship in conn.list_ships():
 			self.temp_map[ship.pos] = ship
 			self.ships.append(ship)
+			#ship.tick()
 		for target in conn.list_primary_targets():
-			self.temp_map[target.pos] = target
 			if target.type.endswith('ARTIFACT'):
 				self.artifacts.append(target)
-				log.good(str(target))
-				print target.tower
+				#log.good(str(target))
+				#spatrol_targets[-1] = target.pos
 			else:
+				self.temp_map[target.pos] = target
 				self.enemies.append(target)
+		ports, towers, artifacts = conn.list_owned_items()
+		for port in ports:
+			self.fields_map[port.pos] = port
+			self.ports.add(port)
+		for tower in towers:
+			self.fields_map[tower.pos] = tower
+			self.towers.add(tower)
+		for artifact in artifacts:
+			#self.temp_map[artifact.pos] = artifact
+			self.artifacts.append(artifact)
+			
 		
 	
 	def draw_land(self):
 		worker.command(tid=0, points=[tuple(island.pos) for island in self.islands],
 					   color=Color.BROWN)
-		for tid, port in enumerate(self.ports, 1000):
-			worker.command(tid=tid, points=[tuple(port.pos)], label=str(port.endur),
-					   	   color=Color.LIGHT_BLUE)
-		for tid, tower in enumerate(self.towers, 2000):
-			worker.command(tid=tid, points=[tuple(tower.pos)], label=str(tower.endur),
-							color=Color.GRAY)
-		for moveable in self.temp_map.values():
+		for still in self.fields_map.itervalues():
+			if still.type != 'ISLAND':
+				still.draw()
+#		for tid, port in enumerate(self.ports, 1000):
+#			worker.command(tid=tid, points=[tuple(port.pos)], label=str(port.endur),
+#					   	   color=Color.LIGHT_BLUE)
+#		for tid, tower in enumerate(self.towers, 2000):
+#			worker.command(tid=tid, points=[tuple(tower.pos)], label=str(tower.endur),
+#							color=Color.GRAY)
+		for artifact in self.artifacts:
+			artifact.draw()
+		for moveable in self.temp_map.itervalues():
 			moveable.draw()
+		try:
+			worker.command(tid=-1, points=[tuple(patrol_targets[-1])], color=Color.WHITE)
+		except KeyError:
+			pass
+
 		
 
 class Point(gui.Point):
@@ -174,9 +223,13 @@ class Point(gui.Point):
 		yield Point(self.x, self.y-1)
 		yield Point(self.x-1, self.y)
 		yield Point(self.x+1, self.y)
+		yield Point(self.x+1, self.y+1)
+		yield Point(self.x+1, self.y-1)
+		yield Point(self.x-1, self.y+1)
+		yield Point(self.x-1, self.y-1)
 
 	def dist(self, point):
-		return abs(self.x - point.x) + abs(self.y - point.y)
+		return self.shoot_dist(point)
 	
 	def diff(self, point):
 		return Point(point.x - self.x, point.y - self.y)
@@ -188,25 +241,36 @@ class Point(gui.Point):
 class Ship(slottedstruct.SlottedStruct):
 	__slots__ = ('id', 'pos', 'type', 'endur', 'turns_left')
 	
+	#def __repr__(self):
+	#	return "%s\t(%d, %d)\t%s\t%s" % (self.id, self.pos.x, self.pos.y, self.type, self.endur)
 	def __repr__(self):
-		return "%s\t(%d, %d)\t%s\t%s" % (self.id, self.pos.x, self.pos.y, self.type, self.endur)
+		return "%s %s %s %s %s %s" % (self.type, self.owner, self.pos, self.endur, self.id,
+									str(self.at()) if self.is_artifact() else "")
+	
+#	@property
+#	def future_pos(self):
+#		return world_map.future_pos[]
+#	
+#	def future_pos(self, t):
+#		return 
+#	
+	@property
+	def owner(self):
+		return 'ME' if self.is_mine() else 'ENEMY'
 	
 	def color(self):
 		#return {'CRUISER': Color.MAGENTA, 'DESTROYER': Color.RED, 'PATROL': Color.PINK}[self.type]
-		if self.is_mine(): return Color.GREEN
 		if self.is_artifact(): return Color.PINK
+		if self.is_mine(): return Color.GREEN
 		return Color.RED
 	
 	def label(self):
-		if self.is_artifact(): return self.type[:1]
+		if self.is_artifact():
+			return self.type[:1]# + ("-my" if  
 		return "%d%s" % (self.endur, self.type[:1])
 	
-	def tid(self):
-		if self.id is not None: return 100+self.id
-		else: return hash(self)
-	
 	def draw(self):
-		worker.command(tid=self.tid(), points=[tuple(self.pos)], label=self.label(), color=self.color())
+		worker.command(tid=(self.is_artifact(), hash(self)), points=[tuple(self.pos)], label=self.label(), color=self.color())
 	
 	def is_mine(self):
 		return self.id is not None
@@ -214,20 +278,34 @@ class Ship(slottedstruct.SlottedStruct):
 	def is_artifact(self):
 		return self.type.endswith('ARTIFACT')
 	
-	@property
-	def tower(self):
-		return world_map.fields_map[self.pos]
-		
+	def at(self):
+		return world_map.fields_map.get(self.pos, None) or world_map.temp_map.get(self.pos, None)
 	
 	
-	@property
 	def target(self):
-		if not world_map.artifacts:
+		#other_art = filter(lambda art: art.owner!='ME', world_map.artifacts)
+		my = self.my_artifact()
+		secured = filter(lambda a: a.owner=='ME' and a.type.startswith('SEC'), world_map.artifacts)
+		if my and secured:
+			closest = min(secured, key=lambda a: self.pos.dist(a.pos))
+			#print self, "going to", closest
+			if self.pos.dist(closest.pos) == 1:
+				conn.myk('put', self.id, self.pos.diff(closest.pos))
+				return None
+			return closest.pos
+		
+		#print map(lambda art: art.owner, world_map.artifacts)
+		towers = filter(lambda t: t.owner!='ME', world_map.towers)
+		if not towers:
 			return patrol_targets.get(-1, None)
 		else:
-			return world_map.artifacts[0].pos
+			return min(towers, key=lambda t: self.pos.dist(t.pos)).pos
 	
-	
+	def my_artifact(self):
+		for artifact in world_map.artifacts:
+			if artifact.pos == self.pos:
+				return artifact
+		return None
 	
 	def _get_new_target(self):
 		N = world_map.N
@@ -236,18 +314,26 @@ class Ship(slottedstruct.SlottedStruct):
 
 	
 	def patrol(self):
-		if self.target is None or self.pos == self.target:
-			self._get_new_target()
-		dist = self.pos.dist(self.target)
-		diff = self.pos.diff(self.target)
+		target = self.target()
+		if target is None:
+			return
+		
+		dist = self.pos.dist(target)
+		diff = self.pos.diff(target)
 		def key(neigh):
 			ndiff = self.pos.diff(neigh)
 			return ndiff.x*diff.x + ndiff.y*diff.y
 		for neigh in sorted(self.pos.neighs(), key=key, reverse=True):
-			if world_map.is_free(neigh) and neigh.dist(self.target) < dist:
+			if world_map.is_free(neigh) and neigh.dist(target) < dist:
 				#print "moving", self.pos, neigh
 				move = self.pos.diff(neigh)
-				conn.move(self.id, move.x, move.y)
+				try:
+					conn.move(self.id, move.x, move.y)
+					#del world_map.temp_map[self.pos]
+					#self.pos = neigh
+					#world_map.temp_map[self.pos] = self
+				except connection.CommandFailedError as e:
+					log.bad(str(e))
 				break
 	
 	RANGE_LB = {'CRUISER': 3, 'DESTROYER': 1, 'PATROL': 1}
@@ -262,11 +348,16 @@ class Ship(slottedstruct.SlottedStruct):
 	
 	def shoot(self, enemy, ammo):
 		shoots = min(max(0, ammo), enemy.endur)
-		for _ in xrange(shoots):
-			print "shooting to", enemy
-			conn.shoot(self.id, self.pos.diff(enemy.pos))
-			enemy.endur -= 1
-		return shoots
+		done = 0
+		try:
+			for _ in xrange(shoots):
+				conn.shoot(self.id, self.pos.diff(enemy.pos))
+				print "shooting to", enemy
+				enemy.endur -= 1
+				done += 1
+		except connection.CommandFailedError as e:
+			log.bad(str(e))
+		return done
 	
 	def try_to_shoot(self):
 		try:
@@ -277,11 +368,11 @@ class Ship(slottedstruct.SlottedStruct):
 				if not ammo: break
 				ammo -= self.shoot(enemy, ammo)
 			
-			for artifact in world_map.artifacts:
-				if self.in_shoot_range(artifact.pos):
-					ammo -= self.shoot(artifact.tower, ammo)
+#			for artifact in filter(lambda artifact: artifact.owner != 'ME', world_map.artifacts):
+#				if self.in_shoot_range(artifact.pos):
+#					ammo -= self.shoot(artifact.tower, ammo)
 				
-			ports = filter(lambda port: port.owner=='ENEMY' and self.in_shoot_range(port.pos), world_map.ports)
+			ports = filter(lambda port: port.owner!='ME' and self.in_shoot_range(port.pos), world_map.ports)
 			if ports:
 				ammo -= self.shoot(ports[0], ammo)
 			
@@ -300,21 +391,58 @@ class Field(slottedstruct.SlottedStruct):
 	def __repr__(self):
 		return "%s %s %s %s" % (self.type, self.owner, self.pos, self.endur)
 
+	def color(self):
+		if self.type == 'ISLAND': return Color.BROWN
+		if self.type == 'PORT': return Color.LIGHT_BLUE
+		return Color.GRAY
+	
+	def label(self):
+		return str(self.endur) + ("*" if self.owner == 'ME' else "?")
+
+	def draw(self):
+		worker.command(tid=hash(self), points=[tuple(self.pos)], label=self.label(), color=self.color())
+
+
 class Clicker(gui.Clicker):
 	def __call__(self, click):
+		print "CLICK", click.point
 		if click.button == 3:
-			print "CLICK", click.point
-			patrol_targets[-1] = click.point 
+			patrol_targets[-1] = click.point
+		elif click.button == 1:
+			print world_map.fields_map.get(Point(*click.point), None)
+			print world_map.temp_map.get(Point(*click.point), None)
 
 
 def build_ships():
 	money = conn.my_stat()[0]
-	for _ in xrange(money):
-		try:
-			conn.launch_ship()
+	try:
+		for _ in xrange(money):
+			if 'light' in args.posargs:
+				conn.launch_ship('PATROL')
+			else:
+				conn.launch_ship('CRUISER')
 			log.good('ship built')
-		except connection.CommandFailedError as e:
-			log.warn(e)
+	except connection.CommandFailedError as e:
+		log.bad(e)
+
+def take_gettable():
+	gettables = filter(lambda a: a.type.startswith('GET'), world_map.artifacts)
+	#print gettables
+	#print world_map.ships
+	for gettable in gettables:
+		at = gettable.at()
+		#if at is not None or at.type != 'TOWER' or :
+		#	continu
+		secs = filter(lambda a: a.type.startswith('SEC') and a.pos==gettable.pos, world_map.artifacts)
+		ok = not secs and (at is None or (at is not None and at.type == 'TOWER' and at.owner == 'ME'))
+		if not ok: continue
+		for ship in world_map.ships:
+			if ship.pos.dist(gettable.pos) == 1:
+				if 'notake' not in args.posargs:
+					conn.myk('GET', ship.id, ship.pos.diff(gettable.pos))
+				log.good('taken')
+				break
+				
 			
 
 
@@ -340,22 +468,37 @@ def loop():
 	read_time()
 	log.info("round %d" % round_no)
 	
-	build_ships()
+	if 'nobuild' not in args.posargs:
+		build_ships()
 	
 	world_map.read_fields()
 	world_map.tick()
+	print "artifacts:"
+	for artifact in world_map.artifacts:
+		print artifact
+	print "towers:"
+	for tower in world_map.towers:
+		print tower
+	print "ports:"
+	for port in world_map.ports:
+		print port
+	
 	worker.command(action='clear')
 	world_map.draw_land()
+	take_gettable()
 	for ship in world_map.ships:
-		print ship
-		ship.draw()
 		ship.try_to_shoot()
 	if 'stay' not in args.posargs:
 		for ship in world_map.ships:
 			ship.patrol()
+	if 'light' in args.posargs:
+		for ship in world_map.ships:
+			if ship.type == 'PATROL':
+				ship.patrol()
 	for enemy in world_map.enemies:
 		print enemy
 	
+	print "========="
 	print conn.time_to_full_moon()
 	print conn.my_stat()
 
@@ -375,8 +518,13 @@ if __name__ == '__main__':
 	
 	try: # main loop
 		while 1:
-			loop()
-			conn.wait()
+			try:
+				loop()
+			except connection.ForcedWaitingError:
+				print "skipping wait"
+				#conn.wait()
+			else:
+				conn.wait()
 	except KeyboardInterrupt:
 		serializer.save((world_map, round_no))
 		pass
