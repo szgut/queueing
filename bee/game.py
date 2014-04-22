@@ -1,6 +1,6 @@
 from aux import *
 
-from dl24.log import RED, MAGENTA, YELLOW, GREEN, RESET
+from dl24.log import RED, MAGENTA, YELLOW, BLUE, GREEN, RESET
 
 vals = {
 		'J': 11,
@@ -38,6 +38,9 @@ class Card(object):
 
 	def __eq__(self, o):
 		return o.val == self.val and o.suit == self.suit
+
+	def __ne__(self, o):
+		return not self.__eq__(o)
 
 	@property
 	def suit(self):
@@ -90,13 +93,13 @@ def select_kitty(mode, cards):
 
 
 
-def play_A(hand, table):
+def play_A(hand, table, left):
 	if there_are(table):
 		# adding a card
 		suit = table[0].suit
 		suited = filter(lambda c: c.suit == suit, hand)
 		if there_are(suited):
-			return play_A_suited(suited, suit, table)
+			return play_A_suited(suited, suit, table, left)
 		else:
 			# no suited cards, choose worst
 			return min_card(hand)
@@ -104,13 +107,27 @@ def play_A(hand, table):
 		# starting
 		return max_card(hand)
 
-def play_A_suited(suited, suit, table):
-	if len(table) < 2:
-		return max_card(suited)
+def play_A_suited(suited, suit, table, left):
+	if len(table) == 1:
+		greater_than_table = filter(lambda c: c.val > table[0].val, suited)
+		if there_are(greater_than_table):
+			max_opponent = max_card(left, only_suit=suit)
+			if max_opponent is not None:
+				max_opponent = max_opponent.val
+			else:
+				max_opponent = 0
+			greater_than_op = filter(lambda c: c.val > max_opponent,
+					greater_than_table)
+			if there_are(greater_than_op):
+				print BLUE + "about to win!!!" + RESET
+				return min_card(greater_than_op)
+			else:
+				return max_card(greater_than_table)
+		else:
+			return min_card(suited)
 	else:
 		# last card, enough to put least better
-		suited_on_table = filter(lambda c: c.suit == suit, table)
-		max_on_table = max(suited_on_table, key=lambda c: c.val)
+		max_on_table = max_card(table, only_suit=suit)
 		guarantees = filter(lambda c: c.val > max_on_table.val, suited)
 		if there_are(guarantees):
 			return min_card(guarantees)
@@ -119,7 +136,7 @@ def play_A_suited(suited, suit, table):
 
 
 
-def play_L(hand, table):
+def play_L(hand, table, left):
 	if there_are(table):
 		# adding a card
 		suit = table[0].suit
@@ -134,15 +151,14 @@ def play_L(hand, table):
 		return min_card(hand)
 
 def play_L_suited(suited, suit, table):
-		suited_on_table = filter(lambda c: c.suit == suit, table)
-		max_on_table = max_card(suited_on_table)
+		max_on_table = max_card(table, only_suit=suit)
 		# find the highest which is lower than max suited on table
 		guarantees = filter(lambda c: c.val < max_on_table.val, suited)
 		if there_are(guarantees):
 			return max_card(guarantees)
 		else:
 			# can't assert win :(
-			if len(table) < 2:
+			if len(table) == 1:
 				# put lowest, hoping someone will play higher
 				return min_card(suited)
 			else:

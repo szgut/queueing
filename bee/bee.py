@@ -159,9 +159,11 @@ def init_state(read):
 
 def update_win_stat(last_mode, my_last_id):
 	global gs
-	global prev_trick
+	global cards_gone
 	trick, fst_player, winner = conn.last_trick()
 	if trick is not None:
+		for c in trick:
+			cards_gone.add(str(c))
 		print "---------------------------------------------------------"
 		print "last trick: %s, started:%i winner:%i" % (
 				str_cards(trick), fst_player, winner)
@@ -185,9 +187,12 @@ def update_win_stat(last_mode, my_last_id):
 
 cycle = -100
 
+cards_gone = set()
+
 def loop():
 	global gs
 	global cycle
+	global cards_gone
 
 	st = conn.get_state()
 
@@ -205,6 +210,7 @@ def loop():
 			print "someone is selecting mode..."
 	elif st == 'KITTY_SELECTION':
 		cycle = 0
+		cards_gone = set()
 		me = conn.get_my_id()
 		selector_id = conn.selector_id()
 		mode = conn.current_game()
@@ -212,6 +218,8 @@ def loop():
 			my_cards = conn.get_my_cards()
 			kitty = select_kitty(mode, my_cards)
 			print "my 20 cards: %s" % str_cards(my_cards)
+			for c in my_cards:
+				cards_gone.add(str(c))
 			print "selecting kitty: %s" % str_cards(kitty)
 			conn.select_kitty(kitty)
 		else:
@@ -223,6 +231,8 @@ def loop():
 			update_win_stat(last_mode=mode, my_last_id=me)
 		my_cards = conn.get_my_cards()
 		on_table = conn.on_table()
+		for c in on_table:
+			cards_gone.add(str(c))
 
 		plays = conn.turn_id()
 		selector_id = conn.selector_id()
@@ -236,13 +246,18 @@ def loop():
 		print "my cards: %s" % str_cards(my_cards)
 		print "table:    %s" % str_cards(on_table)
 		if plays == me:
+			left = set(all_cards()) - cards_gone
+			left = map(Card, left)
+			#print "cards left: %s" % left
 			if mode == 'A':
-				to_play = play_A(hand = my_cards, table = on_table)
+				to_play = play_A(hand=my_cards, table=on_table, left=left)
 			else:
-				to_play = play_L(hand = my_cards, table = on_table)
+				to_play = play_L(hand=my_cards, table=on_table, left=left)
 			print "playing %s" % str(to_play)
 			if to_play is not None:
 				conn.play(to_play)
+			else:
+				print RED + "NOT PLAYING, WHY, NEO, WHY???" + RESET
 		else:
 			print "someone playing now..."
 
