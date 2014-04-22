@@ -7,6 +7,8 @@ from dl24 import connection
 from dl24 import log
 from dl24 import misc
 
+from time import sleep
+
 from aux import *
 from game import *
 
@@ -63,7 +65,8 @@ class Statistic(object):
 class Connection(connection.Connection):
 	def read_cards(self, read_num = True):
 		if read_num:
-			num = self.readint()
+			line = self.readline()
+			num = int(line.strip())
 		else:
 			num = 1 # doesn't matter
 		if num != 0:
@@ -78,11 +81,11 @@ class Connection(connection.Connection):
 	# implementacja komend z zadania
 	def get_state(self):
 		self.cmd("get_state")
-		return self.readstr()
+		return self.readline().strip()
 
 	def get_my_id(self):
 		self.cmd("get_my_id")
-		return self.readint()
+		return int(self.readline())
 
 	def get_my_cards(self):
 		self.cmd("get_my_cards")
@@ -103,15 +106,15 @@ class Connection(connection.Connection):
 
 	def current_game(self):
 		self.cmd("current_game")
-		return self.readstr().strip()
+		return self.readline().strip()
 
 	def selector_id(self):
 		self.cmd("selector_id")
-		return self.readint()
+		return int(self.readline())
 
 	def turn_id(self):
 		self.cmd("turn_id")
-		return self.readint()
+		return int(self.readline())
 
 	def on_table(self):
 		self.cmd("on_table")
@@ -124,7 +127,7 @@ class Connection(connection.Connection):
 		self.cmd("last_trick")
 		trick = self.read_cards(read_num = False)
 		if trick is not None:
-			fst_player, winner = self.readints(2)
+			fst_player, winner = map(int, self.readline().strip().split(' '))
 			return (trick, fst_player, winner)
 		else:
 			return (None, None, None)
@@ -153,48 +156,41 @@ def init_state(read):
 	else:
 		gs = PersistentState()
 
-write_trick_next_time = False
-my_last_id = 0
-last_mode = None
-last_num_cards = -1
 
-stat = Statistic()
+def update_win_stat(last_mode, my_last_id):
+	global gs
+	global prev_trick
+	trick, fst_player, winner = conn.last_trick()
+	if trick is not None:
+		print "---------------------------------------------------------"
+		print "last trick: %s, started:%i winner:%i" % (
+				str_cards(trick), fst_player, winner)
+		print
+		if last_mode == 'A' and winner == my_last_id:
+			print GREEN + "\t\t\tWON!!! (took a trick)" + RESET
+			gs.stat.collect_win()
+		elif last_mode == 'A' and winner != my_last_id:
+			print RED + "\t\t\tLOST (someone took trick)" + RESET
+			gs.stat.collect_loss()
+		elif last_mode == 'L' and winner == my_last_id:
+			print RED + "\t\t\tLOST (took trick, shouldn't have:()" + RESET
+			gs.stat.collect_loss()
+		elif last_mode == 'L' and winner != my_last_id:
+			print GREEN + "\t\t\tWON!!! (didn't take trick)" + RESET
+			gs.stat.collect_win()
+		print gs.stat
+		print
+	else:
+		print "cannot retrieve who won, ignoring..."
+
+cycle = -100
 
 def loop():
-	global write_trick_next_time
-	global my_last_id
-	global last_mode
 	global gs
-	global stat
-	global last_num_cards
+	global cycle
 
 	st = conn.get_state()
-	if write_trick_next_time:
-		print "---------------------------------------------"
-		write_trick_next_time = False
-		trick, fst_player, winner = conn.last_trick()
-		if trick is not None:
-			print "last trick: %s, started:%i winner:%i" % (
-					str_cards(trick), fst_player, winner)
-			print
-			if last_mode == 'A' and winner == my_last_id:
-				print GREEN + "\t\t\tWON!!! (took a trick)" + RESET
-				gs.stat.collect_win()
-			elif last_mode == 'A' and winner != my_last_id:
-				print RED + "\t\t\tLOST (someone took trick)" + RESET
-				gs.stat.collect_loss()
-			elif last_mode == 'L' and winner == my_last_id:
-				print RED + "\t\t\tLOST (took trick, shouldn't have:()" + RESET
-				gs.stat.collect_loss()
-			elif last_mode == 'L' and winner != my_last_id:
-				print GREEN + "\t\t\tWON!!! (didn't take trick)" + RESET
-				gs.stat.collect_win()
-			print gs.stat
-			print
-		else:
-			print "cannot retrieve who won, ignoring..."
 
-	print '---'
 	if st == 'GAME_SELECTION':
 		gs.stat.new_round()
 		me = conn.get_my_id()
@@ -208,6 +204,7 @@ def loop():
 		else:
 			print "someone is selecting mode..."
 	elif st == 'KITTY_SELECTION':
+		cycle = 0
 		me = conn.get_my_id()
 		selector_id = conn.selector_id()
 		mode = conn.current_game()
@@ -222,6 +219,11 @@ def loop():
 	elif st == 'TRICK':
 		me = conn.get_my_id()
 		mode = conn.current_game()
+		if cycle == 3:
+			update_win_stat(last_mode=mode, my_last_id=me)
+		my_cards = conn.get_my_cards()
+		on_table = conn.on_table()
+
 		plays = conn.turn_id()
 		selector_id = conn.selector_id()
 		if plays == me:
@@ -231,13 +233,6 @@ def loop():
 		print "%s%s me:%i plays:%i, sel:%i %s" % (col,
 				mode, me,
 				plays, selector_id, RESET)
-		my_cards = conn.get_my_cards()
-		on_table = conn.on_table()
-		if len(on_table) == 2 and last_num_cards in [1, 2]:
-			write_trick_next_time = True
-			my_last_id = me
-			last_mode = mode
-		last_num_cards = len(on_table)
 		print "my cards: %s" % str_cards(my_cards)
 		print "table:    %s" % str_cards(on_table)
 		if plays == me:
@@ -251,6 +246,12 @@ def loop():
 		else:
 			print "someone playing now..."
 
+		cycle += 1
+		if cycle > 3:
+			cycle = 1
+
+		if cycle == 3 and ((plays == me and len(my_cards) == 1) or (plays != me and len(my_cards) == 0)):
+			update_win_stat(last_mode=mode, my_last_id=me)
 	else:
 		print "BREAK STATE"
 

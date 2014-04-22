@@ -36,6 +36,9 @@ class Card(object):
 			self._val = vals[s[:-1]]
 		self._suit = suits[s[-1]]
 
+	def __eq__(self, o):
+		return o.val == self.val and o.suit == self.suit
+
 	@property
 	def suit(self):
 		return self._suit
@@ -69,7 +72,7 @@ class Card(object):
 
 def select_mode(cards):
 	if len(cards) != 8:
-		raise ValueError("wrong number of cards during selection: %i!" % len(my_cards))
+		raise ValueError("wrong number of cards during selection: %i!" % len(cards))
 	quality = sum([c.val for c in cards]) / 8.0
 	if quality >= 8:
 		return 'A'
