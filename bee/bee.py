@@ -127,9 +127,26 @@ def loop():
 			print "game finished, not checking who took the trick"
 
 	print '---'
-	if st != 'TRICK':
-		print "not supported state"
-	else:
+	if st == 'GAME_SELECTION':
+		me = conn.get_my_id()
+		selector_id = conn.selector_id()
+		if me == selector_id:
+			my_cards = conn.get_my_cards()
+			mode = select_mode(my_cards)
+			conn.select_game(mode)
+		else:
+			print "someone is selecting mode..."
+	elif st == 'KITTY_SELECTION':
+		me = conn.get_my_id()
+		selector_id = conn.selector_id()
+		mode = conn.current_game()
+		if me == selector_id:
+			my_cards = conn.get_my_cards()
+			kitty = select_kitty(mode, my_cards)
+			conn.select_kitty(kitty)
+		else:
+			print "someone is selecting kitty..."
+	elif st == 'TRICK':
 		me = conn.get_my_id()
 		mode = conn.current_game()
 		plays = conn.turn_id()
@@ -157,6 +174,8 @@ def loop():
 			print "playing %s" % str(to_play)
 			if to_play is not None:
 				conn.play(to_play)
+	else:
+		print "BREAK STATE"
 
 
 if __name__ == '__main__':

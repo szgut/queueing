@@ -66,46 +66,82 @@ class Card(object):
 		else:
 			raise ValueError("wrong suit in _pretty_suit")
 
+
+def select_mode(cards):
+	if len(cards) != 8:
+		raise ValueError("wrong number of cards during selection: %i!" % len(my_cards))
+	quality = sum([c.val for c in my_cards]) / 8.0
+	if quality >= 8:
+		return 'A'
+	else:
+		return 'L'
+
+def select_kitty(mode, cards):
+	cards = sorted(cards, key=lambda c: c.val)
+	if mode == 'A':
+		# get rid of low cards
+		return cards[:4]
+	else:
+		# get rid of high cards
+		return cards[-4:]
+
+
+
 def play_A(hand, table):
-	if len(table) != 0:
+	if there_are(table):
 		# adding a card
 		suit = table[0].suit
 		suited = filter(lambda c: c.suit == suit, hand)
-		if len(suited) == 0:
-			# no good cards, choose worst
-			return min(hand, key=lambda c: c.val)
+		if there_are(suited):
+			return play_A_suited(suited, suit, table)
 		else:
-			return max(suited, key=lambda c: c.val)
+			# no suited cards, choose worst
+			return min_card(hand)
 	else:
 		# starting
-		return max(hand, key=lambda c: c.val)
+		return max_card(hand)
+
+def play_A_suited(suited, suit, table):
+	if len(table) < 2:
+		return max_card(suited)
+	else:
+		# last card, enough to put least better
+		suited_on_table = filter(lambda c: c.suit == suit, table)
+		max_on_table = max(suited_on_table, key=lambda c: c.val)
+		guarantees = filter(lambda c: c.val > max_on_table.val, suited)
+		if there_are(guarantees):
+			return min_card(guarantees)
+		else:
+			return min_card(suited)
+
+
 
 def play_L(hand, table):
-	if len(table) != 0:
+	if there_are(table):
 		# adding a card
 		suit = table[0].suit
 		suited = filter(lambda c: c.suit == suit, hand)
-		if len(suited) == 0:
-			# no good cards, choose highest, because it's least valuable
-			return max(hand, key=lambda c: c.val)
-		else:
+		if there_are(suited):
 			return play_L_suited(suited, suit, table)
+		else:
+			# no good cards, choose highest, because it's least valuable
+			return max_card(hand)
 	else:
 		# starting
-		return min(hand, key=lambda c: c.val)
+		return min_card(hand)
 
 def play_L_suited(suited, suit, table):
 		suited_on_table = filter(lambda c: c.suit == suit, table)
-		max_on_table = max(suited_on_table, key=lambda c: c.val)
+		max_on_table = max_card(suited_on_table)
 		# find the highest which is lower than max suited on table
 		guarantees = filter(lambda c: c.val < max_on_table.val, suited)
-		if len(guarantees) != 0:
-			return max(guarantees, key=lambda c: c.val)
+		if there_are(guarantees):
+			return max_card(guarantees)
 		else:
 			# can't assert win :(
 			if len(table) < 2:
 				# put lowest, hoping someone will play higher
-				return min(suited, key=lambda c: c.val)
+				return min_card(suited)
 			else:
 				# use highest, we're loosing anyway
-				return max(suited, key=lambda c: c.val)
+				return max_card(suited)
