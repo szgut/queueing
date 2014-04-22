@@ -32,6 +32,7 @@ struct P {
 	P operator - (P const& p) const { return {x - p.x, y - p.y}; }
 	
 	bool operator == (P const& p) const { return x == p.x && y == p.y; }
+	bool operator != (P const& p) const { return ! (*this == p); }
 };
 
 vector<P> DIRS = {{1,0},{-1,0},{0,1},{0,-1}};
@@ -111,6 +112,10 @@ struct Expl {
 		return capacity * 2 / 3;
 	}
 	
+	int slowness() const {
+		return value > opt_cap() ? 2 : 1;
+	}
+	
 	Expl(int id, int x, int y, int a, float w, int m, float v, float c, int b) :
 		id(id), coo{x,y}, attack(a), weapon(w), monsters(m), value(v), capacity(c), busy(b)
 	{}
@@ -121,7 +126,9 @@ map<P, float> treasures;
 set<P> ass_tr;
 map<P, Mon> monsters;
 vector<Expl> mine;
+set<P> mineset;
 vector<Oth> others;
+// vector<vector<P>> oldirs;
 int WI, HE;
 int ttcollapse;
 
@@ -212,14 +219,31 @@ void add_other(int x, int y, int a) {
 
 void clear_mine() {
 	mine.clear();
+	mineset.clear();
 }
 void add_mine(
 	int id, int x, int y, int attack, float weapon, int monsters,
 	float value, float capacity, int busy
 	) {
 	mine.emplace_back(id, x, y, attack, weapon, monsters, value, capacity, busy);
+	mineset.insert({x,y});
 	// print attack;
 }
+
+void paint() {
+	vector<P> v;
+	for (Oth const& o : others) {
+		v.push_back(o.coo);
+	}
+	viz.send({ v, {150,0,0}, "", 10});
+	v.clear();
+	
+	for (Expl const& e : mine) {
+		v.push_back(e.coo);
+	}
+	viz.send({ v, {255,0,255}, "", 11});
+}
+
 
 // -------------------------------------------------
 
@@ -271,6 +295,34 @@ P first_step(P start, P end, int odl, vector<vector<int>> & flood) {
 	return {0,0};
 }
 
+void ufajnij(vector<vector<float>> & f, P start, float power, float step, float znak) {
+	set<P> used;
+	queue<P> skm;
+	skm.push(start);
+	used.insert(start);
+	while (!skm.empty() && power > 0) {
+		queue<P> zkm;
+		while (!skm.empty()) {
+			P a = skm.front();
+			at(f, a) += power * znak;
+			skm.pop();
+			for (P dir : DIRS) {
+				P b = a + dir;
+				if (at(maze, b) != '#')
+				if (monsters.count(b) == 0)
+				if (znak > 0 || mineset.count(b) == 0)
+				if (used.count(b) == 0) {
+					zkm.push(b);
+					used.insert(b);
+				}
+			}
+		}
+		skm = move(zkm);
+		power *= 0.9; // bo tak
+		power -= step;
+	}
+}
+
 void assign() {
 	{
 	float value = 0;
@@ -291,6 +343,38 @@ void assign() {
 		if (maze[y][x] == 'E') do_flood({x,y}, exit_flood);
 	}
 	
+	map<P, vector<vector<int>>> trefloods;
+	for (auto const& tr : treasures) {
+		P trcoo = tr.first;
+		reset_flood(trefloods[trcoo]);
+		do_flood(trcoo, trefloods[trcoo]);
+	}
+	
+	
+	vector<vector<int>> cleanness;
+	reset_flood(cleanness);
+	
+	vector<vector<float>> fajnosc;
+	fajnosc.assign(HE, vector<float>(WI, 1.0)); // 1, żeby trochę zniechęcać
+	{
+		map<P, int> badExplorers;
+		for (Oth const& oth : others) {
+			badExplorers[oth.coo]++;
+		}
+		for (Expl const& e : mine) {
+			badExplorers[e.coo]--;
+		}
+		for (auto const& p : badExplorers) {
+			if (p.second > 0) {
+				do_flood(p.first, cleanness);
+			}
+		}
+		
+		for (auto const& tr : treasures) {
+			ufajnij(fajnosc, tr.first, tr.second, 0.5, 1);
+		}
+	}
+	
 	int already = 0;
 	while (already < (int)mine.size()) {
 		multimap<float, pair<Expl&,P>> poss;
@@ -301,28 +385,73 @@ void assign() {
 			do_flood(e.coo, flood);
 			//# skarby i wyjścia
 			for (auto const& tr : treasures) {
+				if (tr.first.x > WI || tr.first.y > HE) continue;
 				if (at(flood, tr.first) == INF) continue;
 				if (ass_tr.count(tr.first)) continue;
-				int odl = at(flood, tr.first);
-				float value = min(tr.second, e.capacity - e.value);
+				
 				int slowbefore = e.value > e.opt_cap() ? 2 : 1;
+				int dojazd = at(flood, tr.first) * slowbefore;
+				
+				float capa = e.capacity - e.value;
+				float value_plain = min(tr.second, capa);
+				
+				float kara = 0;
+				float const avgeat = 6;
+				for (Oth const& o : others) {
+					float odist = at(trefloods[tr.first], o.coo);
+					if (odist < dojazd) {
+						if (odist < 13) kara += avgeat;
+						else {
+							odist -= 13;
+							if (odist < 20) kara += avgeat * odist / 20.0;
+						}
+					}
+				}
+				float value_cool = min(at(fajnosc, tr.first) - kara, capa);
+				float value = (value_plain + 3*value_cool) / 4;
+				
 				int slowafter = e.value + value > e.opt_cap() ? 2 : 1; 
-				if (value > 0.1 &&
-					odl * slowbefore + at(exit_flood, tr.first) * slowafter < ttcollapse
-					) {
-					poss.insert({value / odl, {e, tr.first} });
+				
+				int izpowrotem = dojazd + at(exit_flood, tr.first) * slowafter;
+				int krecha = at(exit_flood, e.coo);
+				int kosztodl = izpowrotem - krecha * slowbefore + 1;
+				int czaszzapasem = izpowrotem + 5;
+				
+				float halfcap = e.capacity * 0.5;
+				float wbocznosc = 1.5 + (halfcap - value) / (e.capacity - halfcap);
+				
+				if (value > 0)
+				if (czaszzapasem < ttcollapse)
+				if (e.value < halfcap
+				||  (czaszzapasem < krecha * wbocznosc)) {
+					poss.insert({value / kosztodl, {e, tr.first} });
 				}
 				// else if (e.value == e.capacity) {
 					// value = min(tr.secound, 3*e.capacity/2 - e.value);
 				// }
 			}
+			
 			for (int y : inclusive(1, HE)) for (int x : inclusive(1, WI)) {
 				if (flood[y][x] == INF) continue;
 				if (maze[y][x] == 'E')
-					poss.insert({-flood[y][x], {e, {x,y}} });
+					poss.insert({-1000 - flood[y][x], {e, {x,y}} });
+				float cness = cleanness[y][x];
+				if (cness > 4 && e.value == 0 && 3 * flood[y][x] + 5 < ttcollapse)
+					poss.insert({-flood[y][x]/cness/sqrt(cness), {e, {x,y}} });
 			}
+			
+			//# bajeeeeery
+			
+			// float najfa
 		}
 		//# wybór tu
+		if (poss.empty()) {
+			print "aj!";
+			for (Expl & e : mine) {
+				if (!e.assigned) e.move.kind = -1;
+			}
+			goto zakoniec;
+		}
 		auto wybor = *poss.rbegin();
 		Expl & e = wybor.second.first;
 		P dest = wybor.second.second;
@@ -332,10 +461,12 @@ void assign() {
 			if (dest == e.coo) {
 				if (at(maze, dest) == 'E') {
 					e.move.kind = -1;
-				} else {
+				} else if (treasures.count(dest)) {
 					e.move.kind = 1;
 					e.move.value = min(treasures[dest], e.capacity - e.value);
 					print "!!!!!!!!", treasures[dest], e.capacity, e.value, e.move.value;
+				} else {
+					e.move.kind = -1;
 				}
 			} else {
 				e.move.kind = 0;
@@ -365,6 +496,8 @@ void assign() {
 		already++;
 	}
 	
+	zakoniec:
+	
 	static bool mryg = false;
 	if (mryg) {
 		viz.send({ dests, {255,255,255}, "", 99123 });
@@ -382,21 +515,6 @@ Move get_move(int id) {
 }
 
 // -------------------------------------------------
-
-void paint() {
-	vector<P> v;
-	for (Oth const& o : others) {
-		v.push_back(o.coo);
-	}
-	viz.send({ v, {150,0,0}, "", 10});
-	v.clear();
-	
-	for (Expl const& e : mine) {
-		v.push_back(e.coo);
-	}
-	viz.send({ v, {150,0,150}, "", 11});
-}
-
 void test() {
 	viz.send({ {3,2}, {255,255,0} });
 	int n = in;

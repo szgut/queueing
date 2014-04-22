@@ -7,6 +7,7 @@ struct Move {
 	float value;
 };
 
+// void newmap();
 void set_dims(int wi, int he);
 void push_row(char const* str);
 

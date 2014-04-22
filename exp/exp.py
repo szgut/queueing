@@ -96,7 +96,7 @@ def main(uni):
 						pass
 					else:
 						break
-			(ttch, ttco) = (nttch, nttco)
+		(ttch, ttco) = (nttch, nttco)
 		conn.treasures()
 		conn.monsters()
 		conn.others()
