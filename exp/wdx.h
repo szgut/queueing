@@ -26,6 +26,9 @@ void add_mine(
 	float value, float capacity, int busy
 	);
 
+void clear_eq();
+void add_eq(int id, float price, int attack, float weight);
+
 void set_ttc(int x);
 
 void assign();

@@ -65,6 +65,8 @@ struct Command {
 	)
 };
 
+volatile bool animate = true;
+
 struct Viz : Socket {
 	Viz() : Socket("127.0.0.1", "1234") {}
 	
@@ -73,9 +75,11 @@ struct Viz : Socket {
 	}
 	
 	void send(Command const& c) {
-		string cmd = toJsonStr(c) + "\n";
-		// print cmd;
-		assert(write(fd, cmd.c_str(), cmd.length())>=0);
+		if (animate) {
+			string cmd = toJsonStr(c) + "\n";
+			// print cmd;
+			assert(write(fd, cmd.c_str(), cmd.length())>=0);
+		}
 	}
 	vector<vector<int>> get() {
 		char buf[1005];
@@ -96,6 +100,13 @@ struct Oth {
 	int attack;
 };
 
+struct Eq {
+	int id;
+	float price;
+	int attack;
+	float weight;
+};
+
 struct Expl {
 	int id;
 	P coo;
@@ -107,6 +118,11 @@ struct Expl {
 	int busy;
 	Move move;
 	bool assigned;
+	P smok;
+	
+	float capa() const {
+		return capacity - value - weapon;
+	}
 	
 	float opt_cap() const {
 		return capacity * 2 / 3;
@@ -117,7 +133,7 @@ struct Expl {
 	}
 	
 	Expl(int id, int x, int y, int a, float w, int m, float v, float c, int b) :
-		id(id), coo{x,y}, attack(a), weapon(w), monsters(m), value(v), capacity(c), busy(b)
+		id(id), coo{x,y}, attack(a), weapon(w), monsters(m), value(v), capacity(c), busy(b), smok{0,0}
 	{}
 };
 
@@ -128,6 +144,7 @@ map<P, Mon> monsters;
 vector<Expl> mine;
 set<P> mineset;
 vector<Oth> others;
+vector<Eq> equipment;
 // vector<vector<P>> oldirs;
 int WI, HE;
 int ttcollapse;
@@ -230,6 +247,14 @@ void add_mine(
 	// print attack;
 }
 
+void clear_eq() {
+	equipment.clear();
+}
+
+void add_eq(int id, float price, int attack, float weight) {
+	equipment.push_back({id, price, attack, weight});
+}
+
 void paint() {
 	vector<P> v;
 	for (Oth const& o : others) {
@@ -256,7 +281,7 @@ void reset_flood(vector<vector<int>> & v) {
 	v.assign(HE + 1, vector<int>(WI + 1, INF));
 }
 
-void do_flood(P start, vector<vector<int>> & v) {
+void do_flood(P start, vector<vector<int>> & v, int moc = 1) {
 	int odl = 0;
 	queue<P> skm;
 	at(v, start) = 0;
@@ -272,7 +297,7 @@ void do_flood(P start, vector<vector<int>> & v) {
 			for (P dir : DIRS) {
 				P b = a + dir;
 				if (at(maze, b) != '#')
-				if (monsters.count(b) == 0)
+				if (monsters.count(b) == 0 || monsters[b].attack < moc)
 				if (odl < at(v, b)) {
 					at(v, b) = odl;
 					zkm.push(b);
@@ -324,16 +349,21 @@ void ufajnij(vector<vector<float>> & f, P start, float power, float step, float 
 }
 
 void assign() {
+	static bool mryg = false;
 	{
 	float value = 0;
 	for (Expl const& e : mine) value += e.value;
 	print mine.size(), "ludków, skarbów", value;
 	}
 	
-	for (Expl & e : mine) e.assigned = false;
+	for (Expl & e : mine) {
+		e.assigned = false;
+		e.smok = {0,0};
+	}
 	ass_tr.clear();
 	
 	vector<P> dests;
+	vector<P> smoki;
 	
 	vector<vector<int>> exit_flood;
 	vector<vector<int>> flood;
@@ -369,9 +399,34 @@ void assign() {
 				do_flood(p.first, cleanness);
 			}
 		}
+		vector<P> maximas;
+		for (int y : inclusive(1, HE)) for (int x : inclusive(1, WI)) {
+			P a = {x,y};
+			int cness = at(cleanness, a);
+			if (cness == INF) continue;
+			bool ismax = true;
+			for (P dir : DIRS) {
+				P b = a + dir;
+				if (at(cleanness, b) == INF) continue;
+				if (at(cleanness, b) > cness) ismax = false;
+			}
+			if (ismax) maximas.push_back(a);
+		}
+		for (P p : maximas) {
+			do_flood(p, cleanness);
+		}
 		
 		for (auto const& tr : treasures) {
 			ufajnij(fajnosc, tr.first, tr.second, 0.5, 1);
+		}
+	}
+		
+	map<P, vector<vector<int>>> afloods;
+	for (int y : inclusive(1, HE)) for (int x : inclusive(1, WI)) {
+		if (maze[y][x] == 'A') {
+			P armcoo = {x,y};
+			reset_flood(afloods[armcoo]);
+			do_flood(armcoo, afloods[armcoo]);
 		}
 	}
 	
@@ -382,8 +437,9 @@ void assign() {
 			if (e.assigned) continue;
 			//# odległość do każdego pola
 			reset_flood(flood);
-			do_flood(e.coo, flood);
+			do_flood(e.coo, flood, e.attack);
 			//# skarby i wyjścia
+			
 			for (auto const& tr : treasures) {
 				if (tr.first.x > WI || tr.first.y > HE) continue;
 				if (at(flood, tr.first) == INF) continue;
@@ -392,8 +448,7 @@ void assign() {
 				int slowbefore = e.value > e.opt_cap() ? 2 : 1;
 				int dojazd = at(flood, tr.first) * slowbefore;
 				
-				float capa = e.capacity - e.value;
-				float value_plain = min(tr.second, capa);
+				float value_plain = min(tr.second, e.capa());
 				
 				float kara = 0;
 				float const avgeat = 6;
@@ -407,7 +462,7 @@ void assign() {
 						}
 					}
 				}
-				float value_cool = min(at(fajnosc, tr.first) - kara, capa);
+				float value_cool = min(at(fajnosc, tr.first) - kara, e.capa());
 				float value = (value_plain + 3*value_cool) / 4;
 				
 				int slowafter = e.value + value > e.opt_cap() ? 2 : 1; 
@@ -421,29 +476,133 @@ void assign() {
 				float wbocznosc = 1.5 + (halfcap - value) / (e.capacity - halfcap);
 				
 				if (value > 0)
-				if (czaszzapasem < ttcollapse)
+				if (czaszzapasem * 1.2 < ttcollapse)
 				if (e.value < halfcap
 				||  (czaszzapasem < krecha * wbocznosc)) {
 					poss.insert({value / kosztodl, {e, tr.first} });
 				}
-				// else if (e.value == e.capacity) {
-					// value = min(tr.secound, 3*e.capacity/2 - e.value);
-				// }
 			}
 			
+			float best_clear = -INF;
+			P best_clear_dest = {0,0};
 			for (int y : inclusive(1, HE)) for (int x : inclusive(1, WI)) {
 				if (flood[y][x] == INF) continue;
 				if (maze[y][x] == 'E')
 					poss.insert({-1000 - flood[y][x], {e, {x,y}} });
 				float cness = cleanness[y][x];
-				if (cness > 4 && e.value == 0 && 3 * flood[y][x] + 5 < ttcollapse)
-					poss.insert({-flood[y][x]/cness/sqrt(cness), {e, {x,y}} });
+				if (cness > 4 && e.value == 0 && 2*flood[y][x] + 3*exit_flood[y][x] + 5 < ttcollapse) {
+					float maybe = -flood[y][x]/cness/sqrt(cness)/sqrt(exit_flood[y][x]);
+					if (maybe > best_clear) {
+						best_clear = maybe;
+						best_clear_dest = {x,y};
+					}
+				}
+			}
+			if (best_clear_dest != P{0,0}) {
+				poss.insert({best_clear, {e, best_clear_dest}});
 			}
 			
-			//# bajeeeeery
-			
-			// float najfa
+			//# smoczy pomocnicy
+			// if (e.value == 0) {
+				// for (Expl const& lowca : mine) {
+					// if (lowca.smok != P{0,0})
+					// for (P dir : DIRS) {
+						// P b = lowca.smok + dir;
+						// if (at(flood, b) != INF) {
+							// int time = at(flood, b) + at(exit_flood, lowca.smok) * 2 + 5;
+							// if (time * 1.2f < ttcollapse)
+								// poss.insert({ 10.0f / time, {e, b} });
+						// }
+					// }
+				// }
+			// }
 		}
+		
+		for (auto const& mp : monsters) {
+			
+			int mattack = mp.second.attack;
+			P mcoo = mp.first;
+			if (mcoo.x > WI || mcoo.y > HE) continue;
+			if (ass_tr.count(mcoo)) continue;
+			
+			vector<vector<int>> mflood;
+			reset_flood(mflood);
+			do_flood(mcoo, mflood);
+			
+			int escape_dist = INF;
+			for (int y : inclusive(1, HE)) for (int x : inclusive(1, WI)) {
+				if (maze[y][x] == 'Y') UPlt(escape_dist, mflood[y][x]);
+			}
+			if (escape_dist == INF) continue;
+			
+			float trval = mp.second.value;
+			{
+				float trvaladd = 0;
+				for (P dir : DIRS) {
+					P b = mcoo + dir;
+					if (at(maze, b) != '#' && at(cleanness, b) == INF) {
+						trvaladd = max(trvaladd, at(fajnosc, b));
+					}
+				}
+				trval += trvaladd;
+			}
+			
+			float bestsmok = 0;
+			Expl * beste = &*mine.begin();
+			P smodest = {0,0};
+			for (Expl & e : mine) {
+				if (at(mflood, e.coo) == INF) continue;
+				if (e.attack > mattack) {
+					int time = e.slowness() * at(mflood, e.coo) + 2 * escape_dist;
+					float afterweight = e.value;
+					if (e.monsters == 2) afterweight += e.weapon;
+					float leftca = e.capacity * 1.1f - afterweight;
+					float value = min(leftca + 10.0f, trval);
+					
+					float score = value/time;
+					if (time * 1.2f < ttcollapse)
+					if (score > bestsmok) {
+						beste = &e;
+						bestsmok = score;
+						smodest = mcoo;
+					}
+					
+				} else if (e.attack == 1) {
+					for (auto const& eq : equipment) {
+						if (eq.attack <= mattack) continue;
+						if (eq.price > e.value) continue;
+						float afterweight = e.value - eq.price + eq.weight;
+						if (afterweight > e.capacity) continue;
+						float afterslow = afterweight > e.opt_cap() ? 2 : 1;
+						float leftca = e.capacity * 1.1f - afterweight;
+						for (auto const& arr : afloods) {
+							if (at(mflood, arr.first) == INF) continue;
+							int time =
+								e.slowness() * at(arr.second, e.coo)
+								+ afterslow * at(mflood, arr.first)
+								+ 2 * escape_dist
+							;
+							float value = min(leftca + 10.0f, trval);
+							
+							float score = value/time;
+							if (time * 1.2f < ttcollapse)
+							if (score > bestsmok) {
+								beste = &e;
+								bestsmok = score;
+								e.move.weapon = eq.id;
+								smodest = arr.first;
+							}
+						}
+					}
+				}
+			}
+			if ((int)mine.size() > 7 && bestsmok != 0 && already == 0) {
+				poss.insert({ 4.2f + bestsmok, {*beste, smodest} });
+				smoki.push_back(beste->coo);
+				smoki.push_back(smodest);
+			}
+		}
+		
 		//# wybór tu
 		if (poss.empty()) {
 			print "aj!";
@@ -456,15 +615,28 @@ void assign() {
 		Expl & e = wybor.second.first;
 		P dest = wybor.second.second;
 		e.assigned = true;
-		if (treasures.count(dest)) ass_tr.insert(dest);
+		if (treasures.count(dest) || monsters.count(dest)) ass_tr.insert(dest);
+		if (monsters.count(dest)) e.smok = dest;
+		// if (!treasures.count(dest) && !monsters.count(dest)
+		 // && !(at(maze, dest) == 'E') && !(at(maze, dest) == 'A')) {
+			do_flood(dest, cleanness, e.attack);
+		// }
 		if (e.busy == 0) {
 			if (dest == e.coo) {
 				if (at(maze, dest) == 'E') {
 					e.move.kind = -1;
 				} else if (treasures.count(dest)) {
 					e.move.kind = 1;
-					e.move.value = min(treasures[dest], e.capacity - e.value);
-					print "!!!!!!!!", treasures[dest], e.capacity, e.value, e.move.value;
+					e.move.value = min(treasures[dest], e.capa());
+					// print "!!!!!!!!", treasures[dest], e.capacity, e.value, e.move.value;
+				} else if (monsters.count(dest)) {
+					e.move.kind = 1;
+					e.move.value = min(treasures[dest], e.capa());
+					// print "!!!!!!!!", treasures[dest], e.capacity, e.value, e.move.value;
+				} else if (at(maze, dest) == 'A') {
+					e.move.kind = 3;
+					print "kupuje łepon", e.move.weapon;
+					//# weapon już ustawiony
 				} else {
 					e.move.kind = -1;
 				}
@@ -473,7 +645,7 @@ void assign() {
 				
 				vector<vector<int>> flood;
 				reset_flood(flood);
-				do_flood(e.coo, flood);
+				do_flood(e.coo, flood, e.attack);
 				
 				// print "id", e.id, "ruch", e.coo.x, e.coo.y, "do", dest.x, dest.y;
 				// for (int y : inclusive(1, HE)) for (int x : inclusive(1, WI)) {
@@ -498,11 +670,12 @@ void assign() {
 	
 	zakoniec:
 	
-	static bool mryg = false;
 	if (mryg) {
+		viz.send({ smoki, {255,255,0}, "", 99125});
 		viz.send({ dests, {255,255,255}, "", 99123 });
 	} else {
 		viz.clear(99123);
+		viz.clear(99125);
 	}
 	mryg ^= 1;
 }

@@ -67,6 +67,17 @@ class Connection(connection.Connection):
 			wdx.add_mine(id, x, y, a, w, u, v, c, b)
 		return l
 	
+	def equipment(self):
+		self.cmd("equipment")
+		n = self.readint()
+		wdx.clear_eq()
+		for i in xrange(n):
+			id = self.readint()
+			p = self.readfloat()
+			a = self.readint()
+			w = self.readfloat()
+			wdx.add_eq(id, p, a, w)
+	
 	def ttc(self):
 		self.cmd("time_to_change")
 		ttch = self.readint()
@@ -96,6 +107,7 @@ def main(uni):
 						pass
 					else:
 						break
+			conn.equipment()
 		(ttch, ttco) = (nttch, nttco)
 		conn.treasures()
 		conn.monsters()
@@ -111,6 +123,8 @@ def main(uni):
 					conn.cmd("move", id, m.dx, m.dy)
 				if m.kind == 1:
 					conn.cmd("take_treasure", id, m.value)
+				if m.kind == 3:
+					conn.cmd("buy_weapon", id, m.weapon)
 			except Exception as e:
 				print e
 		conn.wait()
