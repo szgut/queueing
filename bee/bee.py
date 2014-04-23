@@ -22,43 +22,44 @@ class Config(object):
 
 class Statistic(object):
 	def __init__(self):
-		self.wins = 0
-		self.losses = 0
-		self.run_wins = 0
-		self.run_losses = 0
-		self.round_wins = 0
-		self.round_losses = 0
+		self.tricks = 0
+		self.takes = 0
+		self.run_tricks = 0
+		self.run_takes = 0
+		self.round_tricks = 0
+		self.round_takes = 0
 
-	def collect_win(self):
-		self.wins += 1
-		self.run_wins += 1
-		self.round_wins += 1
+	def collect_trick(self):
+		self.tricks += 1
+		self.run_tricks += 1
+		self.round_tricks += 1
+		self.collect_take()
 
-	def collect_loss(self):
-		self.losses += 1
-		self.run_losses += 1
-		self.round_losses += 1
+	def collect_take(self):
+		self.takes += 1
+		self.run_takes += 1
+		self.round_takes += 1
 
 	def new_round(self):
-		self.round_wins = self.round_losses = 0
+		self.round_tricks = self.round_takes = 0
 
 	def new_run(self):
-		self.run_wins = self.run_losses = 0
+		self.run_tricks = self.run_tricks = 0
 
-	def ratio_str(self, wins, losses):
-		if losses != 0:
-			ratio = wins*1.0 / losses
+	def ratio_str(self, tricks, takes):
+		if takes != 0:
+			ratio = "%.2f" % (tricks*1.0 / takes)
 		else:
 			ratio = "-"
 		return ("%s ("+GREEN+"%i"+RESET+"/"+RED+"%i"+RESET+")") % (
 				ratio,
-				wins, losses)
+				tricks, takes)
 
 	def __str__(self):
 		s = ""
-		s += "\twin/loss ratio  : " + self.ratio_str(self.wins, self.losses) + "\n"
-		s +=  "\t\t run    : " + self.ratio_str(self.run_wins,   self.run_losses) + "\n"
-		s +=  "\t\t round  : " + self.ratio_str(self.round_wins, self.round_losses) + "\n"
+		s += "\ttrick ratio    : " + self.ratio_str(self.tricks, self.takes) + "\n"
+		s +=  "\t\t run   : " + self.ratio_str(self.run_tricks,   self.run_takes) + "\n"
+		s +=  "\t\t round : " + self.ratio_str(self.round_tricks, self.round_takes) + "\n"
 		return s
 
 
@@ -144,15 +145,18 @@ def parse_args():
 
 class PersistentState(object):
 	def __init__(self):
-		self.stat = Statistic()
+		self.statL = Statistic()
+		self.statA = Statistic()
 
 
 def init_state(read):
 	global gs
 	if read:
 		gs = serializer.load()
-		gs.stat.new_round()
-		gs.stat.new_run()
+		gs.statL.new_round()
+		gs.statL.new_run()
+		gs.statA.new_round()
+		gs.statA.new_run()
 	else:
 		gs = PersistentState()
 
@@ -170,17 +174,20 @@ def update_win_stat(last_mode, my_last_id):
 		print
 		if last_mode == 'A' and winner == my_last_id:
 			print GREEN + "\t\t\tWON!!! (took a trick)" + RESET
-			gs.stat.collect_win()
+			gs.statA.collect_trick()
 		elif last_mode == 'A' and winner != my_last_id:
 			print RED + "\t\t\tLOST (someone took trick)" + RESET
-			gs.stat.collect_loss()
+			gs.statA.collect_take()
 		elif last_mode == 'L' and winner == my_last_id:
 			print RED + "\t\t\tLOST (took trick, shouldn't have:()" + RESET
-			gs.stat.collect_loss()
+			gs.statL.collect_trick()
 		elif last_mode == 'L' and winner != my_last_id:
 			print GREEN + "\t\t\tWON!!! (didn't take trick)" + RESET
-			gs.stat.collect_win()
-		print gs.stat
+			gs.statL.collect_take()
+		print "stats for A"
+		print gs.statA
+		print "stats for L"
+		print gs.statL
 		print
 	else:
 		print "cannot retrieve who won, ignoring..."
@@ -197,7 +204,8 @@ def loop():
 	st = conn.get_state()
 
 	if st == 'GAME_SELECTION':
-		gs.stat.new_round()
+		gs.statL.new_round()
+		gs.statA.new_round()
 		me = conn.get_my_id()
 		selector_id = conn.selector_id()
 		if me == selector_id:

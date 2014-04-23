@@ -127,8 +127,8 @@ def play_A(hand, table, left):
 				print BLUE + "GOTCHA, you not has dat suit so big!!!" + RESET
 				return min_card(good)
 			else:
-				print RED + "will lose nearly for sure" + RESET
-				return max_card(hand)
+				print RED + "will loose nearly for sure" + RESET
+				return min_card(hand)
 
 def play_A_suited(suited, suit, table, left):
 	if len(table) == 1:
