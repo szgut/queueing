@@ -44,7 +44,7 @@ class Statistic(object):
 		self.round_tricks = self.round_takes = 0
 
 	def new_run(self):
-		self.run_tricks = self.run_tricks = 0
+		self.run_tricks = self.run_takes = 0
 
 	def ratio_str(self, tricks, takes):
 		if takes != 0:
