@@ -266,6 +266,7 @@ def loop():
 			cycle = 1
 
 		if cycle == 3 and ((plays == me and len(my_cards) == 1) or (plays != me and len(my_cards) == 0)):
+			sleep(0.85)
 			update_win_stat(last_mode=mode, my_last_id=me)
 	else:
 		print "BREAK STATE"

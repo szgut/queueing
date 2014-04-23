@@ -109,13 +109,26 @@ def play_A(hand, table, left):
 		for suit in [Card.S, Card.H, Card.D, Card.C]:
 			left_suit = filter(lambda c: c.suit == suit, left)
 			hand_suit = filter(lambda c: c.suit == suit, hand)
-			if not there_are(left_suit) and there_are(hand_suit):
+			if (not there_are(left_suit)) and there_are(hand_suit):
 				killers.append(min_card(hand_suit))
 		if there_are(killers):
 			print BLUE + "GOTCHA, you not has dat suit!!!" + RESET
 			return min_card(killers)
 		else:
-			return max_card(hand)
+			# no killers
+			good = []
+			for suit in [Card.S, Card.H, Card.D, Card.C]:
+				left_suit = filter(lambda c: c.suit == suit, left)
+				hand_suit = filter(lambda c: c.suit == suit, hand)
+				if there_are(hand_suit):
+					max_left = max_card(left_suit)
+					good += filter(lambda c: c.val > max_left.val, hand_suit)
+			if there_are(good):
+				print BLUE + "GOTCHA, you not has dat suit so big!!!" + RESET
+				return min_card(good)
+			else:
+				print RED + "will lose nearly for sure" + RESET
+				return min_card(hand)
 
 def play_A_suited(suited, suit, table, left):
 	if len(table) == 1:
@@ -164,6 +177,7 @@ def play_L(hand, table, left):
 			hand_suit = filter(lambda c: c.suit == suit, hand)
 			if there_are(left_suit) and there_are(hand_suit):
 				no_suiciders.append(min_card(hand_suit))
+		#print "no_su: %s" % no_suiciders
 		if there_are(no_suiciders):
 			return min_card(no_suiciders)
 		else:
