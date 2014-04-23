@@ -160,14 +160,23 @@ def init_state(read):
 	else:
 		gs = PersistentState()
 
-
 def update_win_stat(last_mode, my_last_id):
 	global gs
 	global cards_gone
+	global player_suit_gone
 	trick, fst_player, winner = conn.last_trick()
 	if trick is not None:
+		player = fst_player
 		for c in trick:
 			cards_gone.add(str(c))
+			if c.suit != trick[0].suit:
+				player_suit_gone[player].add(trick[0].suit)
+			player += 1
+			if player > 3:
+				player = 1
+
+		print player_suit_gone
+
 		print "---------------------------------------------------------"
 		print "last trick: %s, started:%i winner:%i" % (
 				str_cards(trick), fst_player, winner)
@@ -195,11 +204,16 @@ def update_win_stat(last_mode, my_last_id):
 cycle = -100
 
 cards_gone = set()
+player_suit_gone = {
+		1: set(),
+		2: set(),
+		3: set()}
 
 def loop():
 	global gs
 	global cycle
 	global cards_gone
+	global player_suit_gone
 
 	st = conn.get_state()
 
@@ -219,6 +233,10 @@ def loop():
 	elif st == 'KITTY_SELECTION':
 		cycle = 0
 		cards_gone = set()
+		player_suit_gone = {
+				1: set(),
+				2: set(),
+				3: set()}
 		me = conn.get_my_id()
 		selector_id = conn.selector_id()
 		mode = conn.current_game()
@@ -258,9 +276,11 @@ def loop():
 			left = map(Card, left)
 			#print "cards left: %s" % left
 			if mode == 'A':
-				to_play = play_A(hand=my_cards, table=on_table, left=left)
+				to_play = play_A(me, hand=my_cards, table=on_table,
+						left=left, gones=player_suit_gone)
 			else:
-				to_play = play_L(hand=my_cards, table=on_table, left=left)
+				to_play = play_L(me, hand=my_cards, table=on_table,
+						left=left, gones=player_suit_gone)
 			print "playing %s" % str(to_play)
 			if to_play is not None:
 				conn.play(to_play)

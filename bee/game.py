@@ -93,13 +93,13 @@ def select_kitty(mode, cards):
 
 
 
-def play_A(hand, table, left):
+def play_A(me, hand, table, left, gones):
 	if there_are(table):
 		# adding a card
 		suit = table[0].suit
 		suited = filter(lambda c: c.suit == suit, hand)
 		if there_are(suited):
-			return play_A_suited(suited, suit, table, left)
+			return play_A_suited(me, suited, suit, table, left, gones)
 		else:
 			# no suited cards, choose worst
 			return min_card(hand)
@@ -130,11 +130,18 @@ def play_A(hand, table, left):
 				print RED + "will loose nearly for sure" + RESET
 				return min_card(hand)
 
-def play_A_suited(suited, suit, table, left):
+def play_A_suited(me, suited, suit, table, left, gones):
 	if len(table) == 1:
 		greater_than_table = filter(lambda c: c.val > table[0].val, suited)
 		if there_are(greater_than_table):
-			max_opponent = max_card(left, only_suit=suit)
+			opo_no = me + 1
+			if opo_no > 3:
+				opo_no = 1
+			left_opponent = left
+			for s in gones[opo_no]:
+				left_opponent = filter(lambda c: c.suit != s, left_opponent)
+				print "filtered suit %s from player %i" % (Card._pretty_suit(s), opo_no)
+			max_opponent = max_card(left_opponent, only_suit=suit)
 			if max_opponent is not None:
 				max_opponent = max_opponent.val
 			else:
@@ -159,7 +166,7 @@ def play_A_suited(suited, suit, table, left):
 
 
 
-def play_L(hand, table, left):
+def play_L(me, hand, table, left, gones):
 	if there_are(table):
 		# adding a card
 		suit = table[0].suit
