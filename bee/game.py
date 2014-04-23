@@ -128,7 +128,7 @@ def play_A(hand, table, left):
 				return min_card(good)
 			else:
 				print RED + "will lose nearly for sure" + RESET
-				return min_card(hand)
+				return max_card(hand)
 
 def play_A_suited(suited, suit, table, left):
 	if len(table) == 1:
