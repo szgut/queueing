@@ -35,6 +35,9 @@ class Button(object):
 
 class Point(slottedstruct.SlottedStruct):
 	__slots__ = ('x', 'y')
+	
+	def __repr__(self):
+		return "(%d, %d)" % (self.x, self.y)
 
 
 class Click(slottedstruct.SlottedStruct):

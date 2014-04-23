@@ -117,9 +117,9 @@ class Connection(object):
 		while 1:
 			self.writeln(*what)
 			try:
-				self._read_ack()
+				return self._read_ack()
 			except ConnectionResetError:
-				pass	# repeat the command
+				self._connect_and_login()
 
 	def wait(self):
 		'''waits for next turn'''

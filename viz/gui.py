@@ -118,7 +118,7 @@ class Viz(Gui):
 		pygame.draw.rect(screen, (0, 0, 0), pygame.Rect((0, 0), self._size))
 		scale = self.comp_scale()
 		shift = self.shift()
-		font = pygame.font.SysFont("Sans", min(100, scale))
+		font = pygame.font.SysFont("Sans", min(100, int(1.2*scale)))
 
 		for _, thing in sorted(self.things.iteritems()):
 			thing.draw(screen, scale, shift)

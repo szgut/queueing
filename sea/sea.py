@@ -116,7 +116,7 @@ class Connection(connection.Connection):
 		
 	def launch_ship(self, ship_type='DESTROYER'):
 		self.cmd('launch_ship', ship_type)
-		return self.readints(3)
+		return self.readints(3)[0]
 	
 	def myk(self, typ, ship_id, diff):
 		self.cmd(typ, ship_id, diff.x, diff.y)
@@ -145,7 +145,7 @@ class WorldMap(object):
 		
 		self.artifacts = []
 		
-		self.poses = []
+		self.fill_poses()
 		
 	def read_fields(self):
 		#self.islands = set()
@@ -159,19 +159,68 @@ class WorldMap(object):
 				self.ports.add(field)
 			if field.type == 'TOWER':
 				self.towers.add(field)
-			
+				
+	def is_ok(self, pos):
+		return not (pos.x < 1 or pos.x > self.N or pos.y < 1 or pos.y > self.N)
+	
 	def is_free(self, pos):
 		if pos.x < 1 or pos.x > self.N or pos.y < 1 or pos.y > self.N:
 			return False
 		return pos not in self.fields_map and pos not in self.temp_map
 	
+	def fill_poses(self):
+#		pos_now = {ship.id: ship.pos for ship in self.ships}
+		self.poses = [{} for _ in xrange(10)]
+	
+	def ensure_pos(self, ship):
+		if ship.id not in self.poses[0]:
+			for pos in self.poses:
+				pos[ship.id] = ship.pos
+	
+	def sweep_poses(self, ids):
+		for pos in self.poses:
+			for sid in pos.keys():
+				if sid not in ids:
+					del pos[sid]
+					
+	def erase_poses(self, sid):
+		for pos in self.poses:
+			if sid in pos:
+				del pos[sid]
+	
+	def tick_poses(self):
+		self.poses.pop(0)
+		self.poses.append(dict(self.poses[-1]))
+	
+	def comp_mass_center(self):
+		sm = Point(0.0, 0.0)
+		for ship in self.ships:
+			sm.x += ship.pos.x
+			sm.y += ship.pos.y
+		if self.ships:
+			sm.x = int(round(sm.x/len(self.ships)))
+			sm.y = int(round(sm.y/len(self.ships)))
+		self.mass_center = sm
+		
+	
 	def tick(self):
+		self.tick_poses()
+		
 		self.temp_map = {}
+		
 		self.ships, self.enemies, self.artifacts = [], [], []
 		for ship in conn.list_ships():
 			self.temp_map[ship.pos] = ship
 			self.ships.append(ship)
+			self.ensure_pos(ship)
 			#ship.tick()
+		self.sweep_poses(set(map(lambda s: s.id, self.ships)))
+		
+		print map(lambda s: (s.id, s.pos), self.ships)[:7], '<<<'
+		for pos in self.poses:
+			print list(pos.iteritems())[:7]
+		self.comp_mass_center()
+		
 		for target in conn.list_primary_targets():
 			if target.type.endswith('ARTIFACT'):
 				self.artifacts.append(target)
@@ -210,7 +259,8 @@ class WorldMap(object):
 		for moveable in self.temp_map.itervalues():
 			moveable.draw()
 		try:
-			worker.command(tid=-1, points=[tuple(patrol_targets[-1])], color=Color.WHITE)
+			if patrol_targets.get(-1, None) is not None:
+				worker.command(tid=-1, points=[tuple(patrol_targets[-1])], color=Color.WHITE)
 		except KeyError:
 			pass
 
@@ -244,8 +294,8 @@ class Ship(slottedstruct.SlottedStruct):
 	#def __repr__(self):
 	#	return "%s\t(%d, %d)\t%s\t%s" % (self.id, self.pos.x, self.pos.y, self.type, self.endur)
 	def __repr__(self):
-		return "%s %s %s %s %s %s" % (self.type, self.owner, self.pos, self.endur, self.id,
-									str(self.at()) if self.is_artifact() else "")
+		return "%s %s %s %s %s %s %s" % (self.type, self.owner, self.pos, self.endur, self.id,
+									str(self.at()) if self.is_artifact() else "", self.turns_left) 
 	
 #	@property
 #	def future_pos(self):
@@ -282,23 +332,73 @@ class Ship(slottedstruct.SlottedStruct):
 		return world_map.fields_map.get(self.pos, None) or world_map.temp_map.get(self.pos, None)
 	
 	
+	
+	def futures(self):
+		return map(lambda di: di[self.id], world_map.poses)
+	
+	@property
+	def inertia(self):
+		return {'CRUISER': 6, 'DESTROYER': 2, 'PATROL': 1}[self.type]
+	
+	
+	
 	def target(self):
 		#other_art = filter(lambda art: art.owner!='ME', world_map.artifacts)
+		if self.turns_left != 'NA':
+			return None
+		
 		my = self.my_artifact()
 		secured = filter(lambda a: a.owner=='ME' and a.type.startswith('SEC'), world_map.artifacts)
 		if my and secured:
 			closest = min(secured, key=lambda a: self.pos.dist(a.pos))
 			#print self, "going to", closest
 			if self.pos.dist(closest.pos) == 1:
-				conn.myk('put', self.id, self.pos.diff(closest.pos))
+				try:
+					conn.myk('put', self.id, self.pos.diff(closest.pos))
+				except connection.CommandFailedError:
+					pass
 				return None
 			return closest.pos
+		if my:
+			return world_map.mass_center
+		
+		
+		secpts = set(map(lambda a: a.pos, filter(lambda a: a.owner=='ME' and a.type.startswith('SEC'), world_map.artifacts)))
+		getpts = set(map(lambda a: a.pos, filter(lambda a: a.owner=='ME' and a.type.startswith('GET'), world_map.artifacts)))
+		both = secpts.intersection(getpts)
+		joiners = filter(lambda s: s.turns_left!='NA', world_map.ships)
+		def jdist(pos):
+			j = min(joiners, key=lambda j: j.pos.dist(pos))
+			return j.pos.dist(pos)
+		if joiners:
+			both = [pos for pos in both if jdist(pos) > 1]
+		
+		if both:
+			print "BOTH", both
+			p = min(both, key=lambda p: self.pos.dist(p))
+			if self.pos.dist(p) == 1:
+				try:
+					conn.myk('join', self.id, self.pos.diff(p))
+				except connection.CommandFailedError as e:
+					log.bad(e)
+			return p
+			
+		
+		aim = patrol_targets.get(-1, None)
+		if aim:
+			#print "aim"
+			return aim
 		
 		#print map(lambda art: art.owner, world_map.artifacts)
 		towers = filter(lambda t: t.owner!='ME', world_map.towers)
 		if not towers:
-			return patrol_targets.get(-1, None)
+			#print "mass"
+			#if 'mass' in args.posargs:
+			diff = world_map.mass_center.diff(self.pos)
+			return Point(self.pos.x+diff.x, self.pos.y+diff.y)
+			#return patrol_targets.get(-1, None)
 		else:
+			#print "tower"
 			return min(towers, key=lambda t: self.pos.dist(t.pos)).pos
 	
 	def my_artifact(self):
@@ -318,22 +418,30 @@ class Ship(slottedstruct.SlottedStruct):
 		if target is None:
 			return
 		
-		dist = self.pos.dist(target)
-		diff = self.pos.diff(target)
+		time = self.inertia
+		mypos = world_map.poses[time][self.id]
+		dist = mypos.dist(target)
+		diff = mypos.diff(target)
 		def key(neigh):
-			ndiff = self.pos.diff(neigh)
+			ndiff = mypos.diff(neigh)
 			return ndiff.x*diff.x + ndiff.y*diff.y
-		for neigh in sorted(self.pos.neighs(), key=key, reverse=True):
-			if world_map.is_free(neigh) and neigh.dist(target) < dist:
+		for neigh in sorted(mypos.neighs(), key=key, reverse=True):
+			if world_map.is_ok(neigh) and neigh.dist(target)<dist and neigh not in world_map.fields_map and neigh not in world_map.poses[time+1].values():
+			#if world_map.is_free(neigh) and neigh.dist(target) < dist:
+				#if 
+				
 				#print "moving", self.pos, neigh
-				move = self.pos.diff(neigh)
+				move = mypos.diff(neigh)
 				try:
 					conn.move(self.id, move.x, move.y)
 					#del world_map.temp_map[self.pos]
 					#self.pos = neigh
-					#world_map.temp_map[self.pos] = self
+					for pos in world_map.poses[time+1:]:
+						pos[self.id] = neigh
 				except connection.CommandFailedError as e:
 					log.bad(str(e))
+					if isinstance(e, connection.ForcedWaitingError):
+						raise
 				break
 	
 	RANGE_LB = {'CRUISER': 3, 'DESTROYER': 1, 'PATROL': 1}
@@ -347,13 +455,14 @@ class Ship(slottedstruct.SlottedStruct):
 		return {'CRUISER': 2, 'DESTROYER': 4, 'PATROL': 1}[self.type]
 	
 	def shoot(self, enemy, ammo):
-		shoots = min(max(0, ammo), enemy.endur)
+		shoots = min(max(0, ammo), enemy.endur + (5 if enemy.type == 'TOWER' else 0))
 		done = 0
 		try:
 			for _ in xrange(shoots):
 				conn.shoot(self.id, self.pos.diff(enemy.pos))
 				print "shooting to", enemy
-				enemy.endur -= 1
+				if enemy.type != 'TOWER':
+					enemy.endur -= 1
 				done += 1
 		except connection.CommandFailedError as e:
 			log.bad(str(e))
@@ -407,10 +516,16 @@ class Clicker(gui.Clicker):
 	def __call__(self, click):
 		print "CLICK", click.point
 		if click.button == 3:
-			patrol_targets[-1] = click.point
+			if patrol_targets.get(-1, None) is not None:
+				patrol_targets[-1] = None
+			else:
+				patrol_targets[-1] = click.point
 		elif click.button == 1:
 			print world_map.fields_map.get(Point(*click.point), None)
 			print world_map.temp_map.get(Point(*click.point), None)
+			sh = world_map.temp_map.get(Point(*click.point), None)
+			if sh is not None and sh.is_mine() and not sh.is_artifact():
+				print sh.futures()
 
 
 def build_ships():
@@ -418,9 +533,10 @@ def build_ships():
 	try:
 		for _ in xrange(money):
 			if 'light' in args.posargs:
-				conn.launch_ship('PATROL')
+				shipid = conn.launch_ship('DESTROYER')
 			else:
-				conn.launch_ship('CRUISER')
+				shipid = conn.launch_ship('CRUISER')
+			world_map.erase_poses(shipid)
 			log.good('ship built')
 	except connection.CommandFailedError as e:
 		log.bad(e)
@@ -439,11 +555,18 @@ def take_gettable():
 		for ship in world_map.ships:
 			if ship.pos.dist(gettable.pos) == 1:
 				if 'notake' not in args.posargs:
-					conn.myk('GET', ship.id, ship.pos.diff(gettable.pos))
+					try:
+						conn.myk('GET', ship.id, ship.pos.diff(gettable.pos))
+					except connection.CommandFailedError as e:
+						log.bad(e)
 				log.good('taken')
 				break
 				
-			
+def move_cargo():
+	for ship in world_map.ships:
+		if ship.my_artifact() is not None:
+			log.good("cargo %s" % ship)
+			ship.patrol()
 
 
 def init_state(read=False):
@@ -486,21 +609,22 @@ def loop():
 	worker.command(action='clear')
 	world_map.draw_land()
 	take_gettable()
+	move_cargo()
 	for ship in world_map.ships:
 		ship.try_to_shoot()
 	if 'stay' not in args.posargs:
 		for ship in world_map.ships:
 			ship.patrol()
-	if 'light' in args.posargs:
-		for ship in world_map.ships:
-			if ship.type == 'PATROL':
-				ship.patrol()
+#	if 'light' in args.posargs:
+#		for ship in world_map.ships:
+#			if ship.type == 'PATROL':
+#				ship.patrol()
 	for enemy in world_map.enemies:
 		print enemy
 	
 	print "========="
 	print conn.time_to_full_moon()
-	print conn.my_stat()
+	print conn.my_stat(), world_map.N
 
 
 if __name__ == '__main__':
