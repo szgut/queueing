@@ -343,6 +343,8 @@ class Ship(slottedstruct.SlottedStruct):
 	
 	def secdist(self):
 		secpts = set(map(lambda a: a.pos, filter(lambda a: a.owner=='ME' and a.type.startswith('SEC'), world_map.artifacts)))
+		if not secpts:
+			return (2,2)
 		najb = min(secpts, key=lambda sp: self.pos.dist(sp))
 		return self.pos.dist(najb), self.pos.diff(najb)
 	
