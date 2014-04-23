@@ -289,7 +289,7 @@ class Point(gui.Point):
 
 
 class Ship(slottedstruct.SlottedStruct):
-	__slots__ = ('id', 'pos', 'type', 'endur', 'turns_left')
+	__slots__ = ('id', 'pos', 'type', 'endur', 'turns_left', 'super_target')
 	
 	#def __repr__(self):
 	#	return "%s\t(%d, %d)\t%s\t%s" % (self.id, self.pos.x, self.pos.y, self.type, self.endur)
@@ -341,11 +341,18 @@ class Ship(slottedstruct.SlottedStruct):
 		return {'CRUISER': 6, 'DESTROYER': 2, 'PATROL': 1}[self.type]
 	
 	
+	def secdist(self):
+		secpts = set(map(lambda a: a.pos, filter(lambda a: a.owner=='ME' and a.type.startswith('SEC'), world_map.artifacts)))
+		najb = min(secpts, key=lambda sp: self.pos.dist(sp))
+		return self.pos.dist(najb), self.pos.diff(najb)
 	
 	def target(self):
 		#other_art = filter(lambda art: art.owner!='ME', world_map.artifacts)
 		if self.turns_left != 'NA':
 			return None
+		
+		if self.super_target is not None:
+			return self.super_target
 		
 		my = self.my_artifact()
 		secured = filter(lambda a: a.owner=='ME' and a.type.startswith('SEC'), world_map.artifacts)
@@ -513,6 +520,9 @@ class Field(slottedstruct.SlottedStruct):
 
 
 class Clicker(gui.Clicker):
+	
+	selected = None
+	
 	def __call__(self, click):
 		print "CLICK", click.point, click.button
 		if click.button == 3:
@@ -526,8 +536,21 @@ class Clicker(gui.Clicker):
 				if sh.turns_left != 'NA':
 					conn.cmd('use_key', sh.id)
 				else:
-					print "soraski"
+					if sh.secdist()[0] == 1: # get
+						try:
+							conn.myk("GET", sh.id, sh.secdist()[1])
+							log.good("get %s" % sh.secdist())
+						except connection.CommandFailedError as e:
+							log.bad(e)
+					else: # select
+						self.selected = sh 
+						log.good("selected %s" % sh)
+			elif self.selected:
+				self.selected.super_target = Point(*click.point)
+				log.good("super target %s: %s" % (self.selected, self.selected.super_target))
+				self.selected = None
 		elif click.button == 1:
+			self.selected = None
 			print world_map.fields_map.get(Point(*click.point), None)
 			print world_map.temp_map.get(Point(*click.point), None)
 			sh = world_map.temp_map.get(Point(*click.point), None)
