@@ -172,9 +172,10 @@ def play_L(me, hand, table, left, gones):
 		suit = table[0].suit
 		suited = filter(lambda c: c.suit == suit, hand)
 		if there_are(suited):
-			return play_L_suited(suited, suit, table, left)
+			return play_L_suited(me, suited, suit, table, left, gones)
 		else:
-			# no good cards, choose highest, because it's least valuable
+			# no suited cards, choose highest, because it's least valuable
+			print GREEN + "about to win!" + RESET
 			return max_card(hand)
 	else:
 		# starting
@@ -191,14 +192,21 @@ def play_L(me, hand, table, left, gones):
 			print RED + "doomed to fail:(" + RESET
 			return max_card(hand)
 
-def play_L_suited(suited, suit, table, left):
+def play_L_suited(me, suited, suit, table, left, gones):
 	if len(table) == 1:
-		min_opponent = min_card(left, only_suit=suit)
+		opo_no = me + 1
+		if opo_no > 3:
+			opo_no = 1
+		left_opponent = left
+		for s in gones[opo_no]:
+			left_opponent = filter(lambda c: c.suit != s, left_opponent)
+			print "filtered suit %s from player %i" % (Card._pretty_suit(s), opo_no)
+		min_opponent = min_card(left_opponent, only_suit=suit)
 		if min_opponent is not None:
 			min_opponent = min_opponent.val
 		else:
 			min_opponent = 15
-		less_than_op = filter(lambda c: c.val < min_opponent,
+		less_than_op = filter(lambda c: c.val < max(min_opponent, table[0].val),
 				suited)
 		if there_are(less_than_op):
 			print BLUE + "about to win!!!" + RESET
