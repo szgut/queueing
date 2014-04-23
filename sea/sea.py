@@ -514,12 +514,19 @@ class Field(slottedstruct.SlottedStruct):
 
 class Clicker(gui.Clicker):
 	def __call__(self, click):
-		print "CLICK", click.point
+		print "CLICK", click.point, click.button
 		if click.button == 3:
 			if patrol_targets.get(-1, None) is not None:
 				patrol_targets[-1] = None
 			else:
 				patrol_targets[-1] = click.point
+		elif click.button == 2:
+			sh = world_map.temp_map.get(Point(*click.point), None)
+			if sh is not None and sh.is_mine() and not sh.is_artifact():
+				if sh.turns_left != 'NA':
+					conn.cmd('use_key', sh.id)
+				else:
+					print "soraski"
 		elif click.button == 1:
 			print world_map.fields_map.get(Point(*click.point), None)
 			print world_map.temp_map.get(Point(*click.point), None)
