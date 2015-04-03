@@ -14,6 +14,7 @@ class Command(object):
 		self.tid = tid or Autotid()
 
 	def __call__(self, thingsset):
+		"""Executed in gui event dispatch thread."""
 		if self.action == 'add':
 			thingsset.add(self.tid, self.thing)
 		elif self.action == 'remove':
