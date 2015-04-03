@@ -4,8 +4,9 @@ import pygame
 class Command(object):
 	"""Command from client, created directly from json."""
 	
-	def __init__(self, action='add', tid=0, points=None, label='', color=(0,255,0), title='', **kwargs):
-		self.thing = Thing(points or [], label, color, **kwargs)
+	def __init__(self, action='add', tid=0, points=None, label='',
+				 color=(0,255,0), shape='rect', title='', **kwargs):
+		self.thing = Thing(points or [], label, color, shape, **kwargs)
 		self.action = action
 		self.title = title
 		if isinstance(tid, list):
@@ -26,10 +27,11 @@ class Command(object):
 class Thing(object):
 	"""Set of points that knows how to draw itself."""
 	
-	def __init__(self, points, label='', color=(0,0,255), **kwargs):
+	def __init__(self, points, label='', color=(0,0,255), shape='rect', **kwargs):
 		self.points = map(tuple, points)
 		self.label = label
 		self.color = color
+		self.shape = shape
 		self.center = self._mass_center()
 
 	def _mass_center(self):
@@ -44,23 +46,29 @@ class Thing(object):
 		return repr(self.points)
 
 	@staticmethod
-	def _scale(point, scale, _shift):
-		(x, y), (sx, sy) = point, _shift
+	def _scale(point, scale, shift):
+		(x, y), (sx, sy) = point, shift
 		return (x * scale - sx, y * scale - sy)
+	
+	@property
+	def _draw_method(self):
+		if self.shape == 'circle':
+			return pygame.draw.ellipse
+		else:
+			return pygame.draw.rect
 
-	@staticmethod
-	def _square(point, width):
-		return pygame.Rect(point, (width, width))
-
-	def draw(self, screen, scale, _shift):
+	def draw(self, screen, scale, shift):
 		for point in self.points:
-			scaled_point = self._scale(point, scale, _shift)
+			scaled_point = self._scale(point, scale, shift)
 			if scale == 1:
 				pygame.draw.line(screen, self.color, scaled_point, scaled_point)
 			else:
-				pygame.draw.rect(screen, self.color, self._square(scaled_point, scale))
+				rect = pygame.Rect(scaled_point, (scale, scale))
+				self._draw_method(screen, self.color, rect)
 
 	def draw_label(self, screen, scale, _shift, font):
+		if not self.label:
+			return
 		label = font.render(self.label, 1, (255, 255, 0))
 		screen.blit(label, self._scale(self.center, scale, _shift))
 
