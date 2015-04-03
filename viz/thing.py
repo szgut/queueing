@@ -92,13 +92,10 @@ class ThingsSet(object):
 		self._things = {}
 
 	def tids_at(self, point):
+		"""Yields tids of things that contain given point."""
 		for tid, thing in self._things.iteritems():
 			if point in thing.points:
 				yield tid
-
-	def points(self, thing):
-		for point in thing.points:
-			yield self.reverse(point)
 
 	@property
 	def size(self):
@@ -110,10 +107,9 @@ class ThingsSet(object):
 		return (maxx, maxy)
 
 	def __iter__(self):
-		return self._things.itervalues()
+		"""Yields things sorted by tid."""
+		for _, thing in sorted(self._things.iteritems()):
+			yield thing
 
 	def __repr__(self):
 		return repr(self._things)
-
-	def iteritems(self):
-		return self._things.iteritems()

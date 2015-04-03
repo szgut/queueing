@@ -85,9 +85,9 @@ class Viz(Gui):
 	MOVE_KEYS = {pygame.K_LEFT: (-1, 0), pygame.K_RIGHT: (1, 0),
 		 		 pygame.K_UP: (0, -1), pygame.K_DOWN: (0, 1)}
 
-	def __init__(self, callback, *args):
+	def __init__(self, clicks_callback, *args):
 		super(Viz, self).__init__(*args)
-		self.callback = callback
+		self.clicks_callback = clicks_callback
 		self._reset_zoom()
 		self.things = thing.ThingsSet()
 
@@ -105,7 +105,7 @@ class Viz(Gui):
 			point = ((pos[0] + shift[0])/scale, (pos[1]+shift[1])/scale)
 			tids = list(self.things.tids_at(point))
 			print point, tids
-			self.callback(point, tids, button)
+			self.clicks_callback(point, tids, button)
 
 	def handle_keydown(self, key):
 		if key in self.MOVE_KEYS:
@@ -145,7 +145,7 @@ class Viz(Gui):
 		shift = self._shift()
 		font = pygame.font.SysFont("Sans", min(100, int(1.2*scale)))
 
-		for _, thing in sorted(self.things.iteritems()):
+		for thing in self.things:
 			thing.draw(screen, scale, shift)
 
 		for thing in self.things:
