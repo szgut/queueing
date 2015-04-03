@@ -40,10 +40,8 @@ class Gui(object):
 	def _events():
 		"""Yields at least one event, more if available without waiting."""
 		yield pygame.event.wait()
-		event = pygame.event.poll()
-		while event.type != pygame.NOEVENT:
+		for event in pygame.event.get():
 			yield event
-			event = pygame.event.poll()
 
 	def _handle_event(self, event):
 		"""Calls event handler and returns whether the screen needs redrawing."""

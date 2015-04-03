@@ -19,3 +19,13 @@ class TestThingsSet(unittest.TestCase):
 		
 		ts.add(4, thing.Thing([(5,4)]))
 		self.assertEqual(ts.size, (5,4))
+
+
+class TestAutotid(unittest.TestCase):
+
+	def test_compare(self):
+		a1, a2 = thing.Autotid(), thing.Autotid()
+		self.assertTrue(a1 < a2)
+		self.assertTrue(a1 < 1)
+		self.assertTrue(a1 < -1)
+		self.assertTrue(a1 < (0, 0))
