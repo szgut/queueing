@@ -2,6 +2,7 @@
 import contextlib
 import json
 import socket
+import time
 import threading
 
 from dl24 import slottedstruct
@@ -52,15 +53,14 @@ class Clicker(object):
 class Worker(threading.Thread):
 
 	def __init__(self, title=None, gui_hostport=('localhost', 1234),
-				 autostart=True, clicker=Clicker()):
+				 clicker=Clicker()):
 		super(Worker, self).__init__()
 		self.daemon = True
 		self._clicker = clicker
 		self._cfile = self._connect_gui(gui_hostport)
 		if title is not None:
-			self.command(action='set_title', title=title)
-		if autostart:
-			self.start()
+			self.set_title(title)
+		self.start()
 
 	def _connect_gui(self, hostport):
 		sock = socket.socket()
@@ -92,6 +92,12 @@ class Worker(threading.Thread):
 			return True
 		except (IOError, socket.error):
 			return False
+	
+	def set_title(self, title):
+		return self.command(action='set_title', title=title)
+	
+	def clear(self):
+		return self.command(action='clear')
 
 
 if __name__ == '__main__':
@@ -99,4 +105,5 @@ if __name__ == '__main__':
 	w.command(tid=(6, "bla"), points=[(1, 2), (2, 3), (3, 4)], label='siedę')
 	for x in xrange(6):
 		w.command(tid=x+10, points=[(x,x)], color=Color.LIGHT_BLUE)
-	w.join()
+	while True:
+		time.sleep(10)

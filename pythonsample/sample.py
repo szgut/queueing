@@ -65,7 +65,7 @@ def loop():
 	
 	world_map.tick()
 	
-	worker.command(action='clear')
+	worker.clear()
 	world_map.draw_land()
 
 
