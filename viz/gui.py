@@ -72,8 +72,15 @@ class Gui(object):
 class Viz(Gui):
 	"""Class that draws things on the screen."""
 
+	# colors
+	BLACK = (0, 0, 0)
+	WHITE = (255, 255, 255)
+
 	# mouse scrolling is translated to zooming with keyboard
 	SCROLL_BTNS = {4: pygame.K_EQUALS, 5: pygame.K_MINUS}
+	
+	# mouse button for context label
+	CONTEXT_BTN = 3
 
 	ZOOM_STEP = 1.25
 	# zooming with + and - keys
@@ -83,11 +90,13 @@ class Viz(Gui):
 	MOVE_KEYS = {pygame.K_LEFT: (-1, 0), pygame.K_RIGHT: (1, 0),
 		 		 pygame.K_UP: (0, -1), pygame.K_DOWN: (0, 1)}
 
+
 	def __init__(self, clicks_callback, *args):
 		super(Viz, self).__init__(*args)
 		self.clicks_callback = clicks_callback
 		self._reset_zoom()
 		self.things = thing.ThingsSet()
+		self.context_label = None
 
 	def _reset_zoom(self):
 		"""Puts the screen back into initial position with no zoom."""
@@ -95,15 +104,26 @@ class Viz(Gui):
 		self.zoom = 1.0  # factor multiplicating width of square
 
 	def handle_click(self, pos, button):
+		if button == self.CONTEXT_BTN:
+			if self.context_label is None:
+				thing = self.things.topmost_thing(self._pos_to_point(pos))
+				if thing is not None and thing.context_label:
+					self.context_label = (pos, thing.context_label)
+			else:
+				self.context_label = None
 		if button in self.SCROLL_BTNS:
 			self._zoom(self.SCROLL_BTNS[button],
 					   float(pos[0])/self._size[0], float(pos[1])/self._size[1])
 		else:
-			scale, shift = self._comp_scale(), self._shift()
-			point = ((pos[0] + shift[0])/scale, (pos[1]+shift[1])/scale)
+			point = self._pos_to_point(pos)
 			tids = list(self.things.tids_at(point))
 			print point, tids
 			self.clicks_callback(point, tids, button)
+	
+	def _pos_to_point(self, pos):
+		"""Converts pixel coordinates to virtual point."""
+		scale, shift = self._comp_scale(), self._shift()
+		return ((pos[0] + shift[0])/scale, (pos[1]+shift[1])/scale)
 
 	def handle_keydown(self, key):
 		if key in self.MOVE_KEYS:
@@ -138,16 +158,23 @@ class Viz(Gui):
 		return (int(self.O[0] * self.zoom), int(self.O[1] * self.zoom))
 
 	def render(self, screen):
-		pygame.draw.rect(screen, (0, 0, 0), pygame.Rect((0, 0), self._size))
+		pygame.draw.rect(screen, self.BLACK, pygame.Rect((0, 0), self._size))
 		scale = self._comp_scale()
 		shift = self._shift()
 		font = pygame.font.SysFont("Sans", min(100, int(1.2*scale)))
+		context_font = pygame.font.SysFont("Sans", 20)
 
 		for thing in self.things:
 			thing.draw(screen, scale, shift)
 
 		for thing in self.things:
 			thing.draw_label(screen, scale, shift, font)
+		
+		if self.context_label is not None:
+			pos, text = self.context_label
+			for i, line in enumerate(text.split('\n')):
+				label = context_font.render(line, True, self.BLACK, self.WHITE)
+				screen.blit(label, (pos[0], pos[1] + i * context_font.get_linesize()))
 
 
 def main(clicks_callback=lambda x: None):

@@ -5,8 +5,8 @@ class Command(object):
 	"""Command from client, created directly from json."""
 	
 	def __init__(self, action='add', tid=None, points=None, label='',
-				 color=(0,255,0), shape='rect', title='', **kwargs):
-		self.thing = Thing(points or [], label, color, shape, **kwargs)
+				 context_label='', color=(0,255,0), shape='rect', title='', **kwargs):
+		self.thing = Thing(points or [], label, context_label, color, shape, **kwargs)
 		self.action = action
 		self.title = title
 		if isinstance(tid, list):
@@ -46,9 +46,11 @@ class Autotid(object):
 class Thing(object):
 	"""Set of points that knows how to draw itself."""
 	
-	def __init__(self, points, label='', color=(0,0,255), shape='rect', **kwargs):
+	def __init__(self, points, label='', context_label='',
+				 color=(0,0,255), shape='rect', **kwargs):
 		self.points = set(map(tuple, points))
 		self.label = label
+		self.context_label = context_label
 		self.color = color
 		self.shape = shape
 		self.center = self._mass_center()
@@ -85,11 +87,11 @@ class Thing(object):
 				rect = pygame.Rect(scaled_point, (scale, scale))
 				self._draw_method(screen, self.color, rect)
 
-	def draw_label(self, screen, scale, _shift, font):
+	def draw_label(self, screen, scale, shift, font):
 		if not self.label:
 			return
 		label = font.render(self.label, 1, (255, 255, 0))
-		screen.blit(label, self._scale(self.center, scale, _shift))
+		screen.blit(label, self._scale(self.center, scale, shift))
 
 
 class ThingsSet(object):
@@ -109,6 +111,13 @@ class ThingsSet(object):
 
 	def clear(self):
 		self._things = {}
+		
+	def topmost_thing(self, point):
+		"""Returns thing with the greatest tid at given point, or None."""
+		for thing in reversed(list(self)):
+			if point in thing.points:
+				return thing
+		return None
 
 	def tids_at(self, point):
 		"""Yields tids of things that contain given point."""
