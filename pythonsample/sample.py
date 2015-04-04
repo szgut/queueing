@@ -43,17 +43,15 @@ class Clicker(gui.Clicker):
 		print "CLICK", click.point, click.button
 
 
-class WorldMap(object):
+class World(object):
 	
 	def __init__(self):
 		pass
-		
-	def tick(self):
-		pass
 	
-	def draw_land(self):
-		worker.command(tid=0, points=[tuple(island.pos) for island in self.islands],
-					   color=Color.BROWN)
+	def draw(self):
+		pass
+		#worker.command(tid=0, points=[tuple(island.pos) for island in self.islands],
+		#			   color=Color.BROWN)
 
 
 def loop():
@@ -62,19 +60,17 @@ def loop():
 	
 	if 'nobuild' not in args.posargs:
 		pass
-	
-	world_map.tick()
-	
-	worker.clear()
-	world_map.draw_land()
+
+	#worker.clear()
+	world.draw()
 
 
 def init_state(load=False):
-	global world_map, round_no
+	global world, round_no
 	if load:
-		world_map, round_no = serializer.load()
+		world, round_no = serializer.load()
 	else:
-		world_map = WorldMap()
+		world = World()
 		round_no = conn.round_no()
 
 
@@ -94,7 +90,7 @@ if __name__ == '__main__':
 	conn = Connection(config.host, config.port)
 	log.info("logged in")
 
-	worker = gui.Worker(title='SEA-%d' % args.universum, clicker=Clicker())
+	#worker = gui.Worker(title='SEA-%d' % args.universum, clicker=Clicker())
 	init_state(args.loadstate)
 	
 	try: # main loop
@@ -106,7 +102,7 @@ if __name__ == '__main__':
 			else:
 				conn.wait()
 	except KeyboardInterrupt:
-		serializer.save((world_map, round_no))
+		serializer.save((world, round_no))
 	except:
 		traceback.print_exc()
-		serializer.save((world_map, round_no), ".crash")
+		serializer.save((world, round_no), ".crash")
