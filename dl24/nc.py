@@ -17,8 +17,8 @@ class Reader(threading.Thread):
 			print self.conn.readline()
 
 
-def main(host, sport):
-	conn = connection.Connection(host, int(sport))
+def main(login, password, host, port_str):
+	conn = connection.Connection(login, password, (host, int(port_str)))
 	Reader(conn).start()
 	try:
 		while True:

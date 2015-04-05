@@ -9,7 +9,7 @@ import time
 from dl24 import log
 
 
-def insist(exception=KeyboardInterrupt, wait=None):
+def insist(exception=KeyboardInterrupt, wait_secs=None):
 	def decorator(fun):
 		@functools.wraps(fun)
 		def wrapper(*args, **kwargs):
@@ -18,8 +18,8 @@ def insist(exception=KeyboardInterrupt, wait=None):
 					return fun(*args, **kwargs)
 				except exception:
 					log.bad("retrying %s..." % fun.__name__)
-					if wait is not None:
-						time.sleep(wait)
+					if wait_secs is not None:
+						time.sleep(wait_secs)
 		return wrapper
 	return decorator
 

@@ -34,10 +34,11 @@ class ConnectionResetError(Exception):
 
 class Connection(object):
 		
-	def __init__(self, host='localhost', port=20003):
-		self._host = host
-		self._port = port
-		self._connect_and_login()
+	def __init__(self, login, password, hostport):
+		self._login = login
+		self._password = password
+		self._hostport = hostport
+		self._connect_and_authenticate()
 
 	def _catch_read(self, fun):
 		try: return fun(self.f)
@@ -84,45 +85,45 @@ class Connection(object):
 		'''connect to server'''
 		s = socket.socket()
 		s.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
-		s.connect((self._host, self._port))
+		s.connect(self._hostport)
 		self.f = s.makefile('r+', 1)
 		s.close()
 	
-	@misc.insist((ConnectionResetError, EOFError, socket.error), wait=2)
-	def _connect_and_login(self):
+	@misc.insist((ConnectionResetError, EOFError, socket.error), wait_secs=2)
+	def _connect_and_authenticate(self):
 		self._connect()
-		self._login()
+		self._authenticate()
 
-	def _login(self, name="team27", password="ddwednuhwx"):
-		'''login to server'''
+	def _authenticate(self):
+		"""Logs in to server."""
 		self._readstr_assert('LOGIN')
-		self.writeln(name)
+		self.writeln(self._login)
 		self._readstr_assert('PASS')
-		self.writeln(password)
+		self.writeln(self._password)
 		self._read_ack()
 
 	def cmd(self, *what):
-		'''sends command what, waits for OK, reads some lines'''
+		"""Sends command what and waits for OK. Repeats if necessary."""
 		while 1:
 			self.writeln(*what)
 			try:
 				return self._read_ack()
 			except ConnectionResetError:
-				self._connect_and_login()
+				self._connect_and_authenticate()
 			except (ForcedWaitingError, NoCurrentWorld):
 				pass	# repeat the command
 
 	def throwing_cmd(self, *what):
-		''' throws ForcedWaitingError '''
+		"""Throws ForcedWaitingError."""
 		while 1:
 			self.writeln(*what)
 			try:
 				return self._read_ack()
 			except ConnectionResetError:
-				self._connect_and_login()
+				self._connect_and_authenticate()
 
 	def wait(self):
-		'''waits for next turn'''
+		"""Waits for the next turn."""
 		self.cmd('WAIT')
 		log.info(self.readline())
 		self._read_ack()

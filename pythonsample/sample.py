@@ -13,9 +13,10 @@ from dl24.gui import Color
 
 class Config(object):
 	def __init__(self, universum=1):
-		self.host = 'universum.dl24'
+		self.hostport = ('universum.dl24', 20003 + universum - 1)
+		self.login = 'team007'
+		self.password = 's3cr3t'
 		self.datafile = 'data'
-		self.port = 20003+universum-1
 
 
 class Connection(connection.Connection):
@@ -46,7 +47,7 @@ class Clicker(gui.Clicker):
 class World(object):
 	
 	def __init__(self):
-		pass
+		print "reading world..."
 	
 	def draw(self):
 		pass
@@ -78,7 +79,7 @@ def read_time():
 	global round_no
 	old_round_no = round_no
 	round_no = conn.round_no()
-	if round_no > old_round_no:
+	if round_no < old_round_no:
 		init_state()
 
 
@@ -87,7 +88,7 @@ if __name__ == '__main__':
 	print args.posargs
 	config = Config(args.universum)
 	serializer = misc.Serializer(config.datafile)
-	conn = Connection(config.host, config.port)
+	conn = Connection(config.login, config.password, config.hostport)
 	log.info("logged in")
 
 	#worker = gui.Worker(title='SEA-%d' % args.universum, clicker=Clicker())
