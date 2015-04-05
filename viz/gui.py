@@ -68,6 +68,10 @@ class Gui(object):
 	def render(self, screen):
 		pass
 
+	def pressed_key_names(self):
+		return [pygame.key.name(key)
+					for key, pressed in enumerate(pygame.key.get_pressed())
+					if pressed]
 
 class Viz(Gui):
 	"""Class that draws things on the screen."""
@@ -103,22 +107,27 @@ class Viz(Gui):
 		self.O = (0, 0)  # shift in pixels before zooming 
 		self.zoom = 1.0  # factor multiplicating width of square
 
+	def _flip_context_label(self, pos):
+		"""Shows or hides context label."""
+		if self.context_label is None:
+			thing = self.things.topmost_thing(self._pos_to_point(pos))
+			if thing is not None and thing.context_label:
+				self.context_label = (pos, thing.context_label)
+		else:
+			self.context_label = None
+
 	def handle_click(self, pos, button):
 		if button == self.CONTEXT_BTN:
-			if self.context_label is None:
-				thing = self.things.topmost_thing(self._pos_to_point(pos))
-				if thing is not None and thing.context_label:
-					self.context_label = (pos, thing.context_label)
-			else:
-				self.context_label = None
+			self._flip_context_label(pos)
 		if button in self.SCROLL_BTNS:
 			self._zoom(self.SCROLL_BTNS[button],
 					   float(pos[0])/self._size[0], float(pos[1])/self._size[1])
 		else:
 			point = self._pos_to_point(pos)
 			tids = list(self.things.tids_at(point))
-			print point, tids
-			self.clicks_callback(point, tids, button)
+			key_names = self.pressed_key_names()
+			print point, tids, button, key_names
+			self.clicks_callback(point, tids, button, key_names)
 	
 	def _pos_to_point(self, pos):
 		"""Converts pixel coordinates to virtual point."""

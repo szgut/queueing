@@ -42,7 +42,7 @@ class Point(slottedstruct.SlottedStruct):
 
 
 class Click(slottedstruct.SlottedStruct):
-	__slots__ = ('point', 'tidlist', 'button')
+	__slots__ = ('point', 'tidlist', 'button', 'key_names')
 
 
 class Clicker(object):
@@ -72,7 +72,7 @@ class Worker(threading.Thread):
 	def _parse_click(line):
 		try:
 			obj = json.loads(line)
-			return Click(Point(*obj[0]), obj[1], obj[2])
+			return Click(Point(*obj[0]), *obj[1:])
 		except (ValueError, IndexError) as e:
 			log.warn(e)
 

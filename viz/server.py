@@ -84,10 +84,10 @@ class Connection(multiprocessing.Process):
 				time.sleep(0)
 
 
-	def _clicked_callback(self, point, tids, button):
+	def _clicked_callback(self, *args):
 		"""Callback invoked on click."""
 		try:
-			print>>self.cfile, json.dumps((point, tids, button))
+			print>>self.cfile, json.dumps(args)
 		except IOError as e:
 			print e
 
