@@ -1,3 +1,4 @@
+from json_serializer import serializable, Serializer
 
 class SlottedStruct(object):
 	__slots__ = ()
@@ -26,6 +27,16 @@ class SlottedStruct(object):
 		get = lambda attr: attr + "=" + repr(getattr(self, attr))
 		return "%s(%s)" % (type(self).__name__, ", ".join(map(get, self.__slots__)))
 
+def serializable_slotted_struct(name, *attrs):
+    """ Usage:
+
+        Ifka = serializable_slotted_struct('Ifka', 'x', 'y')
+    """
+    attr_names = [Serializer.wrapper_name(a) for a in attrs]
+    class S(SlottedStruct):
+        __slots__ = attrs
+    S.__name__ = name
+    return serializable(*attr_names)(S)
 
 if __name__ == '__main__':
 
